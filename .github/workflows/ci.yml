@@ -1,0 +1,32 @@
+name: build-and-test
+on: [push, pull_request]
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - compiler: ldc-latest
+            dc: ldc2
+          - compiler: dmd-latest
+            dc: dmd
+    env:
+      DC: ${{ matrix.dc }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build meson libssl-dev
+      - run: dub build -c rattbuild --compiler="$DC"
+      - if: matrix.dc == 'ldc2'
+        run: ./build/rattbuild build --warnings-as-errors
+      - run: dub test --compiler="$DC"
+      - run: dub build -c rattsc --compiler="$DC"
+      - run: ./build/rattsc --test tests/script
+      - if: matrix.dc == 'ldc2'
+        run: ./tests/integration/run.sh
+      - if: matrix.dc == 'ldc2'
+        run: dub run dscanner@0.16.0-beta.5 --compiler="$DC" -- --styleCheck source/

@@ -1,0 +1,4 @@
+# test: spec
+project(name: "duplicate", version: "1.0.0", kind: "single")
+rule(name: "same", output: "build/one", command: ["true"])
+rule(name: "same", output: "build/two", command: ["true"])

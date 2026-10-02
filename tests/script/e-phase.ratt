@@ -1,0 +1,4 @@
+# phase: construction
+import "fs"
+let write = fs.write
+write("bad.txt", "bad")

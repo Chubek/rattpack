@@ -1,0 +1,2 @@
+# test: manifest
+package(name: "../escape", version: "1.0.0")

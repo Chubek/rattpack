@@ -1,0 +1,7 @@
+let values = [1] +
+  [2, 3]
+let answer = (
+  2 *
+    21
+)
+print(values, answer)

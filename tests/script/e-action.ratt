@@ -1,0 +1,3 @@
+# test: build
+project(name: "failure", version: "1.0.0", kind: "single")
+rule(name: "failure", output: "build/failure", command: ["false"])

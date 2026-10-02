@@ -1,0 +1,3 @@
+# test: floating
+package(name: "floating", version: "1.0.0")
+deps { dep "example" from: git("https://example.org/repo.git"), branch: "main" }

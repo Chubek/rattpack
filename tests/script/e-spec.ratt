@@ -1,0 +1,2 @@
+# test: spec
+project(name: "empty", version: "1.0.0", kind: "single")

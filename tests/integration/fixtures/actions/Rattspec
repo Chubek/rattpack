@@ -1,0 +1,8 @@
+project(name: "actions", version: "1.0.0", kind: "single")
+import "fs"
+let suffix = "!"
+fn decorate(value: str) -> str { return value + suffix }
+let generated = rule(name: "generated", output: "build/message.txt")
+action(generated) { fs.write("build/message.txt", decorate("deferred") + "\n") }
+let copied = rule(name: "copied", inputs: ["build/message.txt"], output: "build/copy.txt", deps: [generated])
+action(copied) { fs.copy("build/message.txt", "build/copy.txt") }

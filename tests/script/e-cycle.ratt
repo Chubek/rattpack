@@ -1,0 +1,4 @@
+# test: spec
+project(name: "cycle", version: "1.0.0", kind: "single")
+rule(name: "a", output: "build/a", deps: ["b"], command: ["true"])
+rule(name: "b", output: "build/b", deps: ["a"], command: ["true"])

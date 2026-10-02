@@ -1,0 +1,3 @@
+project(name: "hello", version: "1.0.0", kind: "single")
+import "target"
+target.executable(name: "hello", language: "c", sources: ["hello.c"])

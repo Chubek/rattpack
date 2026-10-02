@@ -1,0 +1,6 @@
+import "str"
+import "path"
+print(str.join(str.split("a:b:c", ":"), "/"))
+print(str.upper("ratt"), str.trim("  pack  "))
+print(path.basename(path.join("one", "two.txt")), path.stem("two.txt"))
+print(type(path.value("file")), type(nil), type(1.25))

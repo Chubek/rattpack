@@ -1,0 +1,48 @@
+name "rattpack"
+description "Portable Rattscript build system and package manager"
+authors "Rattpack contributors"
+copyright "Copyright © 2026 Rattpack contributors"
+license "MIT"
+targetPath "build"
+sourcePaths
+importPaths "source"
+dependency "rattpack:runtime" version="*"
+subPackage "runtime"
+dflags "-preview=dip1000"
+dflags "-link-defaultlib-shared" platform="ldc"
+dflags "-defaultlib=libphobos2.so" platform="linux-dmd"
+lflags "-rpath=$$ORIGIN" platform="linux"
+lflags "-rpath=@loader_path" platform="osx"
+
+configuration "rattbuild" {
+    targetType "executable"
+    targetName "rattbuild"
+    mainSourceFile "source/apps/rattbuild/main.d"
+}
+configuration "rattsc" {
+    targetType "executable"
+    targetName "rattsc"
+    mainSourceFile "source/apps/rattsc/main.d"
+}
+configuration "rattpkg" {
+    targetType "executable"
+    targetName "rattpkg"
+    mainSourceFile "source/apps/rattpkg/main.d"
+}
+configuration "bootstrap-runtime" {
+    targetType "none"
+}
+configuration "unittest" {
+    targetType "executable"
+    targetName "rattpack-test"
+    sourcePaths "tests/unit"
+    mainSourceFile "tests/unit/main.d"
+    dependency "unit-threaded" version="==2.0.5"
+}
+configuration "quality" {
+    targetType "none"
+    dependency "dfmt" version="==0.15.2"
+    dependency "dscanner" version="==0.16.0-beta.5"
+    subConfiguration "dfmt" "library"
+    subConfiguration "dscanner" "library"
+}

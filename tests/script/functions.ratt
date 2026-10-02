@@ -1,0 +1,11 @@
+fn factorial(n: int) -> int {
+  if n < 2 { return 1 }
+  return n * factorial(n - 1)
+}
+fn make_adder(x: int) { return fn(y: int) { return x + y } }
+let add = make_adder(7)
+print(factorial(6), add(5))
+let total = 0
+for n in range(5) { total += n }
+while total < 13 { total += 1 }
+print(total, false and missing(), true or missing())

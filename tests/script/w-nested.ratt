@@ -1,0 +1,3 @@
+# test: nested
+project(name: "root", version: "1.0.0", kind: "single")
+rule(name: "root", output: "build/root", command: ["true"])

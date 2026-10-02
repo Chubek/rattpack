@@ -1,0 +1,2 @@
+# test: identity
+project(name: "wrong", version: "1.0.0", kind: "single")

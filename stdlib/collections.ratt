@@ -1,0 +1,18 @@
+# Pure Rattscript extensions are embedded in librattpack.
+fn map(values: list, transform: fn) -> list {
+    let result = []
+    for value in values { result.append(transform(value)) }
+    return result
+}
+
+fn filter(values: list, predicate: fn) -> list {
+    let result = []
+    for value in values { if predicate(value) { result.append(value) } }
+    return result
+}
+
+fn fold(values: list, initial, combine: fn) {
+    let result = initial
+    for value in values { result = combine(result, value) }
+    return result
+}

@@ -1,0 +1,4 @@
+project(name: "@{dirname}", version: "0.1.0", kind: "single")
+import "fs"
+import "target"
+target.executable(name: "@{dirname}", language: "d", sources: fs.glob("src/**/*.d"))

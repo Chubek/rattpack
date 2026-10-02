@@ -1,0 +1,11 @@
+/build/
+/.dub/
+/.rattpack/
+/*.o
+/*.obj
+/*.a
+/*.so
+/*.dll
+/*.dylib
+/Rattpkg.lock
+**/__pycache__/

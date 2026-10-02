@@ -1,0 +1,10 @@
+let minimum: int = -9223372036854775808
+let maximum: int = 9223372036854775807
+print(minimum, maximum)
+assert(maximum > maximum - 1)
+assert(minimum < minimum + 1)
+assert(maximum != maximum - 1)
+assert(minimum == -maximum - 1)
+assert(not (float("nan") <= 1))
+assert(not (float("nan") >= 1))
+print("exact comparisons")

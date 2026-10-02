@@ -1,0 +1,4 @@
+project(name: "@{dirname}", version: "0.1.0", kind: "single")
+import "fs"
+let welcome = rule(name: "welcome", output: "build/welcome.txt")
+action(welcome) { fs.write("build/welcome.txt", "@{dirname}\n") }

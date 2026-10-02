@@ -1,0 +1,3 @@
+# test: manifest
+package(name: "checksums", version: "1.0.0")
+deps { dep "archive" from: http("https://example.org/archive.tar.gz") }

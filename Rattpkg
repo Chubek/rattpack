@@ -1,0 +1,23 @@
+package(name: "rattpack", version: "0.1.0", license: "MIT")
+deps {
+  dep "toml" from: git("https://github.com/dlang-community/toml.git"), rev: "8ce26af5064ae35e7a136ed454e5fd29f7c9f8af"
+  dep "dyaml" from: git("https://github.com/dlang-community/D-YAML.git"), tag: "v0.10.0"
+  dep "tinyendian" from: git("https://github.com/dlang-community/tinyendian.git"), tag: "v0.2.0"
+  dep "requests" from: git("https://github.com/ikod/dlang-requests.git"), tag: "v2.2.1"
+  dep "cachetools" from: git("https://github.com/ikod/cachetools.git"), tag: "v0.4.2"
+  dep "automem" from: git("https://github.com/atilaneves/automem.git"), tag: "v0.6.11"
+  dep "test_allocator" from: git("https://github.com/atilaneves/test_allocator.git"), tag: "v0.3.4"
+  dep "semver" from: git("https://github.com/dcarp/semver.git"), tag: "v0.8.0"
+  dep "msgpack-d" from: git("https://github.com/msgpack/msgpack-d.git"), tag: "v1.0.5"
+  dep "taggedalgebraic" from: git("https://github.com/s-ludwig/taggedalgebraic.git"), tag: "v1.0.1"
+  dep "emsi_containers" from: git("https://github.com/dlang-community/containers.git"), tag: "v0.9.0"
+  dep "argparse" from: git("https://github.com/andrey-zherikov/argparse.git"), tag: "v2.1.0"
+  dep "arsd-official" from: git("https://github.com/adamdruppe/arsd.git"), tag: "v12.1.2"
+  dep "unit-threaded" from: git("https://github.com/atilaneves/unit-threaded.git"), tag: "v2.0.5"
+  dep "dfmt" from: git("https://github.com/dlang-community/dfmt.git"), tag: "v0.15.2"
+  dep "dscanner" from: git("https://github.com/dlang-community/D-Scanner.git"), tag: "v0.16.0-beta.5"
+  dep "libdparse" from: git("https://github.com/dlang-community/libdparse.git"), tag: "v0.25.1"
+  dep "libddoc" from: git("https://github.com/dlang-community/libddoc.git"), tag: "v0.8.0"
+  dep "dcd" from: git("https://github.com/dlang-community/DCD.git"), tag: "v0.16.2"
+  dep "inifiled" from: git("https://github.com/burner/inifile-D.git"), tag: "v1.3.3"
+}

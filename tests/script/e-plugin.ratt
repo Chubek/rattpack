@@ -1,0 +1,2 @@
+# test: plugin
+# A Rattscript source is not a loadable native plugin.

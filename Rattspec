@@ -1,0 +1,27 @@
+project(name: "rattpack", version: "0.1.0", kind: "monorepo")
+monorepo {
+  ignore "tests"
+  ignore "third_party"
+}
+import "fs"
+import "toolchain"
+import "proc"
+let compiler = toolchain.discover("d")
+let python = proc.which("python3")
+if not python { python = proc.which("python") }
+let native = fs.glob("third_party/blake3/c/*") + fs.glob("third_party/libgit2/src/**/*") +
+  fs.glob("third_party/libgit2/include/**/*") + fs.glob("third_party/libgit2/cmake/*") +
+  fs.glob("third_party/libgit2/deps/**/*") + fs.glob("third_party/zlib/*") +
+  fs.glob("third_party/xz/src/**/*") + fs.glob("third_party/xz/cmake/*") +
+  ["third_party/libgit2/CMakeLists.txt", "third_party/xz/CMakeLists.txt"]
+let runtime = rule(name: "librattpack", output: "build/" + toolchain.runtime_library,
+  inputs: fs.glob("source/rattpack/**/*.d") + fs.glob("stdlib/*.ratt") +
+    ["runtime/dub.sdl", "dub.sdl", "dub.selections.json", "tools/dogfood.py", "tools/build-native.py", "tools/native/CMakeLists.txt", "source/rattpack/native/bridge.c"],
+  raw_inputs: fs.glob("profiles/*.in") + native,
+  command: [python, "tools/dogfood.py", "--compiler", compiler.command, "library"],
+  toolchain: compiler.fingerprint, sandbox: false)
+for app in ["rattbuild", "rattpkg", "rattsc"] {
+  rule(name: app, output: "build/" + app + toolchain.executable_suffix, deps: [runtime],
+    inputs: ["source/apps/" + app + "/main.d", "tools/dogfood.py"],
+    command: [python, "tools/dogfood.py", "--compiler", compiler.command, "app", app], toolchain: compiler.fingerprint)
+}

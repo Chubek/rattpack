@@ -1,0 +1,4 @@
+project(name: "@{dirname}", version: "0.1.0", kind: "single")
+import "fs"
+import "target"
+target.library(name: "@{dirname}", language: "c", sources: fs.glob("src/**/*.c"))

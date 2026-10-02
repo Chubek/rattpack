@@ -1,0 +1,2 @@
+# lint
+fn bad() -> int { return "wrong" }
