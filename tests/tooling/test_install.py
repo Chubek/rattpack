@@ -1,5 +1,6 @@
 """Installation checks without a D compiler or administrator privileges."""
 import importlib.util
+import errno
 import os
 from pathlib import Path
 import subprocess
@@ -97,6 +98,43 @@ class InstallationTests(unittest.TestCase):
                 installer.install(plan, destination)
         self.assertEqual((destination / "bin/first").read_text(), "old")
         self.assertFalse((destination / "bin/second").exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX directory symlinks")
+    def test_symlinked_directories_stage_and_roll_back_on_each_filesystem(self):
+        destination = self.root / "install"
+        destination.mkdir()
+        for name in ("bin", "share"):
+            directory = self.root / (name + " filesystem")
+            directory.mkdir()
+            (destination / name).symlink_to(directory, target_is_directory=True)
+        first = destination / "bin/first"
+        first.write_text("old")
+        plan = [(self.build / installer.APPLICATIONS[0], Path("bin/first")),
+                (self.build / installer.APPLICATIONS[1], Path("share/second")),
+                (self.build / installer.APPLICATIONS[2], Path("share/third"))]
+        real_replace = installer.os.replace
+
+        def replace(source, target):
+            # Emulate EXDEV for a rename between these filesystem roots.
+            if Path(source).resolve().relative_to(self.root).parts[0] != \
+                    Path(target).resolve().relative_to(self.root).parts[0]:
+                raise OSError(errno.EXDEV, "Invalid cross-device link")
+            if Path(target).name == "third":
+                raise PermissionError("injected publication failure")
+            return real_replace(source, target)
+
+        with patch.object(installer.os, "replace", side_effect=replace):
+            with self.assertRaisesRegex(PermissionError, "injected publication failure"):
+                installer.install(plan, destination)
+        self.assertEqual(first.read_text(), "old")
+        self.assertFalse((destination / "share/second").exists())
+        self.assertFalse(list(self.root.rglob(".rattpack-install-*")))
+
+        with patch.object(installer.os, "replace", side_effect=replace):
+            installer.install(plan[:2], destination)
+        self.assertEqual(first.read_bytes(), b"new payload")
+        self.assertEqual((destination / "share/second").read_bytes(), b"new payload")
+        self.assertFalse(list(self.root.rglob(".rattpack-install-*")))
 
 
 if __name__ == "__main__":

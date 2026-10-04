@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build and install a relocatable Rattpack layout using only Python's stdlib."""
 import argparse
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import shutil
@@ -61,24 +62,30 @@ def install(plan, destination):
         if not parent.is_dir():
             raise ValueError(f"destination parent is not a directory: {parent}")
     destination.mkdir(parents=True, exist_ok=True)
-    # Stage the whole payload on the destination filesystem before publishing.
+    # Prefix subdirectories may be symlinks or mounts on other filesystems.
+    # Stage each file and its rollback backup beside its final destination.
     # os.replace preserves already mapped executables/libraries on POSIX.
-    with tempfile.TemporaryDirectory(prefix=".rattpack-install-", dir=destination) as staging:
+    with ExitStack() as cleanup:
+        directories = {}
+        staged = []
         for source, relative in plan:
-            temporary = Path(staging) / relative
-            temporary.parent.mkdir(parents=True, exist_ok=True)
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.parent not in directories:
+                directories[target.parent] = Path(cleanup.enter_context(
+                    tempfile.TemporaryDirectory(prefix=".rattpack-install-", dir=target.parent)))
+            staging = directories[target.parent]
+            temporary = staging / target.name
             shutil.copy2(source, temporary)
+            backup = staging / "backups" / target.name
+            if target.exists():
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, backup)
+            staged.append((temporary, target, backup))
         published = []
-        backups = Path(staging) / "backups"
         try:
-            for _, relative in plan:
-                target = destination / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                backup = backups / relative
-                if target.exists():
-                    backup.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(target, backup)
-                os.replace(Path(staging) / relative, target)
+            for temporary, target, backup in staged:
+                os.replace(temporary, target)
                 published.append((target, backup))
         except OSError:
             for target, backup in reversed(published):
