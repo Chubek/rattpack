@@ -133,8 +133,19 @@ $env:Path = "C:\path\to\rattpack\build;" + $env:Path
 rattbuild --version
 ```
 
-There is no separate Rattpack install subcommand. Deploy the built application
-and library layout using your environment's normal installation mechanism.
+Install the built applications, shared library, profiles, templates, and manuals
+with the repository installer (defaults to `~/.local`):
+
+```sh
+./install.sh
+./install.sh --prefix /path/to/prefix
+```
+
+Pass `--build` to bootstrap all three applications with DUB before installing,
+and `--compiler=dmd` to select DMD. Prepare the submodules first as described in
+section 2.2. Use `--dry-run` to preview an existing build without copying files;
+`--destdir` stages the prefix for packaging. `--with-plugins` includes the native
+exporters. On Windows, invoke `python tools/install.py` with the same options.
 
 ## 2.6 Platform setup
 

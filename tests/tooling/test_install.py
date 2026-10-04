@@ -1,6 +1,8 @@
 """Installation checks without a D compiler or administrator privileges."""
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -21,6 +23,28 @@ class InstallationTests(unittest.TestCase):
         suffix, library, _ = installer.platform_names()
         for name in [app + suffix for app in installer.APPLICATIONS] + [library]:
             (self.build / name).write_bytes(b"new payload")
+
+    @unittest.skipIf(os.name == "nt", "POSIX shell launcher")
+    def test_shell_launcher_installs_from_another_directory(self):
+        destination = self.root / "prefix with spaces"
+        result = subprocess.run([str(ROOT / "install.sh"), "--build-dir", str(self.build),
+                                 "--prefix", str(destination)], cwd=self.root,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for app in installer.APPLICATIONS:
+            self.assertEqual((destination / "bin" / (app + installer.platform_names()[0])).read_bytes(),
+                             b"new payload")
+
+    @unittest.skipIf(os.name == "nt", "POSIX shell launcher")
+    def test_shell_launcher_propagates_failure(self):
+        (self.build / installer.platform_names()[1]).unlink()
+        destination = self.root / "install"
+        result = subprocess.run([str(ROOT / "install.sh"), "--build-dir", str(self.build),
+                                 "--prefix", str(destination)], cwd=self.root,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("missing build products", result.stderr)
+        self.assertFalse(destination.exists())
 
     def test_missing_runtime_does_not_create_destination(self):
         (self.build / installer.platform_names()[1]).unlink()
