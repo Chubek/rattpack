@@ -348,9 +348,9 @@ unittest
     scope (exit)
         fixture.close;
     foreach (profile; [
-            "c-exe", "c-lib", "cxx-exe", "cxx-lib", "d-exe", "d-lib", "empty",
-            "monorepo"
-        ])
+        "c-exe", "c-lib", "cxx-exe", "cxx-lib", "d-exe", "d-lib", "empty",
+        "monorepo"
+    ])
     {
         auto root = buildPath(fixture.root, profile ~ " project");
         initialize(root, profile, fixture.config, true);
