@@ -1,0 +1,5 @@
+package(name: @{dirname_literal}, version: "0.1.0", license: @{license_literal})
+
+deps {
+  # Add pinned dependencies here.
+}

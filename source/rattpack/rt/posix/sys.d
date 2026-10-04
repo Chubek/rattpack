@@ -11,7 +11,7 @@ version (Posix)
         import std.process : environment;
         import std.path : buildPath;
         import core.sys.posix.dlfcn;
-        import std.string : toStringz, fromStringz;
+        import std.string : toStringz, fromStringz, startsWith;
         import std.parallelism : totalCPUs;
 
         enum executableSuffix = "";
@@ -67,6 +67,15 @@ version (Posix)
             return findProgram(name, environment.get("PATH", ""));
         }
 
+        string[string] buildProcessEnvironment()
+        {
+            string[string] result = [
+                "PATH": environment.get("PATH", ""), "LANG": "C",
+                "LC_ALL": "C", "TZ": "UTC", "SOURCE_DATE_EPOCH": "0"
+            ];
+            return result;
+        }
+
         string shellQuote(string value) @safe
         {
             import std.string : replace;
@@ -96,7 +105,54 @@ version (Posix)
             return error is null ? "unknown loader error" : error.fromStringz.idup;
         }
 
-        ProcessResult runSandboxed(string[] argv, string cwd, string[] writable, string temporary)
+        ProcessResult runHermetic(string[] argv, string cwd, string[] writable,
+                string temporary, string[] readable, string[string] env)
+        {
+            import rattpack.diagnostic : fail;
+            import std.file : exists, mkdirRecurse;
+            import std.path : dirName;
+            import std.conv : to;
+
+            auto program = locateProgram("bwrap");
+            if (!program.length)
+                fail("E_HERMETIC", "strict subprocess isolation requires Bubblewrap");
+            string[] command = [
+                program, "--die-with-parent", "--unshare-all", "--new-session",
+                "--tmpfs", "/"
+            ];
+            // These are the trusted system toolchain and runtime roots. The project
+            // and user home are absent; only declared input files are mounted below.
+            foreach (directory; ["/usr", "/bin", "/sbin", "/lib", "/lib64"])
+                if (exists(directory))
+                    command ~= ["--ro-bind", directory, directory];
+            if (exists("/etc/ld.so.cache"))
+                command ~= ["--ro-bind", "/etc/ld.so.cache", "/etc/ld.so.cache"];
+            command ~= [
+                "--proc", "/proc", "--dev", "/dev", "--bind", temporary, temporary
+            ];
+            foreach (i, directory; writable)
+            {
+                auto stage = buildPath(temporary, "outputs", i.to!string);
+                mkdirRecurse(stage);
+                command ~= ["--bind", stage, directory];
+            }
+            foreach (file; readable)
+                command ~= ["--ro-bind", file, file];
+            command ~= ["--dir", cwd, "--chdir", cwd, "--"];
+            env = env.dup;
+            env["HOME"] = temporary;
+            env["XDG_CONFIG_HOME"] = buildPath(temporary, "config");
+            env["XDG_CACHE_HOME"] = buildPath(temporary, "cache");
+            env["TMPDIR"] = temporary;
+            env["PYTHONDONTWRITEBYTECODE"] = "1";
+            auto result = runProcess(command ~ argv, cwd, env, false);
+            if (result.status && result.output.startsWith("bwrap:"))
+                fail("E_HERMETIC", "strict subprocess isolation failed: " ~ result.output);
+            return result;
+        }
+
+        ProcessResult runSandboxed(string[] argv, string cwd, string[] writable,
+                string temporary, string[string] env = null)
         {
             static int available;
             auto program = locateProgram("bwrap");
@@ -122,10 +178,10 @@ version (Posix)
                     "--bind", temporary, temporary, "--chdir", cwd, "--"
                 ];
             }
-            return runProcess(command ~ argv, cwd, [
-                "TMPDIR": temporary,
-                "PYTHONDONTWRITEBYTECODE": "1"
-            ]);
+            env = env.dup;
+            env["TMPDIR"] = temporary;
+            env["PYTHONDONTWRITEBYTECODE"] = "1";
+            return runProcess(command ~ argv, cwd, env, false);
         }
     }
 }

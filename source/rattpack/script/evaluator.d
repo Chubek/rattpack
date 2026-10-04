@@ -282,6 +282,11 @@ class Evaluator
     Environment scriptScope;
     string cwd;
     string[] writeRoots;
+    bool hermetic;
+    string[] readableFiles;
+    string[] writableFiles;
+    bool environmentFrozen;
+    string[string] processEnvironment;
     ProcessResult delegate(string[], string) processRunner;
     string delegate(string, string) sourceTransform;
     void delegate(string) output;
@@ -292,8 +297,40 @@ class Evaluator
     bool[string] loading;
     private Stmt[string] parsed;
 
-    void requireWrite(string path, Location loc)
+    void requireRead(string path, Location loc)
     {
+        if (!hermetic)
+            return;
+        path = buildNormalizedPath(path);
+        if (!readableFiles.canFind(path) && !writableFiles.canFind(path))
+            fail("E_HERMETIC", "undeclared action input: " ~ path, loc);
+        rejectSymlinks(path, loc);
+    }
+
+    private void rejectSymlinks(string path, Location loc)
+    {
+        import std.file : isSymlink;
+
+        for (auto ancestor = path; ancestor.length; ancestor = dirName(ancestor))
+        {
+            if (exists(ancestor) && isSymlink(ancestor))
+                fail("E_HERMETIC", "hermetic paths cannot traverse symlinks", loc);
+            if (ancestor == dirName(ancestor))
+                break;
+        }
+    }
+
+    void requireWrite(string path, Location loc, bool directory = false)
+    {
+        if (hermetic)
+        {
+            path = buildNormalizedPath(path);
+            rejectSymlinks(path, loc);
+            foreach (file; writableFiles)
+                if (path == file || (directory && file.startsWith(path ~ dirSeparator)))
+                    return;
+            fail("E_HERMETIC", "undeclared action output: " ~ path, loc);
+        }
         if (!writeRoots.length)
             return;
         path = buildNormalizedPath(path);
@@ -736,6 +773,7 @@ class Evaluator
             fail("E_IMPORT", "spec discovery is automatic; do not import specs", loc);
         auto path = buildNormalizedPath(absolutePath(buildPath(dirName(loc.file) == "."
                 ? cwd : dirName(loc.file), name)));
+        requireRead(path, loc);
         if (!exists(path))
             fail("E_IMPORT", "module not found: " ~ path, loc);
         if (loading.get(path, false))

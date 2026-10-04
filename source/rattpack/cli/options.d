@@ -20,6 +20,8 @@ struct BuildOptions
     @NamedArgument("warnings-as-errors") bool warningsAsErrors;
     /// Initialize a new root spec.
     @(NamedArgument("init").Description("Create a Rattspec from a profile")) bool initializeProject;
+    /// Include source files and package boilerplate for a shipped profile.
+    @(NamedArgument("scaffold").Description("With --init, create a buildable starter project")) bool scaffold;
     /// Profile to preprocess during initialization.
     @NamedArgument("profile") string profile;
     /// List installed profiles.
@@ -34,6 +36,8 @@ struct BuildOptions
     @NamedArgument("output", "o") string output;
     /// Built-in exporter name or plugin library path.
     @NamedArgument("to") string exporter;
+    /// Require strict input, output, environment and subprocess isolation.
+    @NamedArgument("hermetic") bool hermetic;
     /// Print actions without executing them.
     @NamedArgument("dry-run") bool dryRun;
     /// Print the version and exit.

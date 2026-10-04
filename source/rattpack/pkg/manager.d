@@ -5,7 +5,7 @@ import rattpack.pkg.lockfile;
 import rattpack.pkg.archive;
 import rattpack.native.libraries;
 import rattpack.config.environment;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.script.parser;
 import rattpack.script.ast;
 import rattpack.script.value;

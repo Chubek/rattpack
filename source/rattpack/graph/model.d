@@ -1,8 +1,9 @@
 module rattpack.graph.model;
 
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.serialization;
 import rattpack.diagnostic;
+import rattpack.rt.sys : buildProcessEnvironment;
 import std.json;
 import std.algorithm;
 import std.path;
@@ -34,6 +35,9 @@ class Action
     string settings;
     string cwd;
     string toolchain;
+    string[string] environment;
+    string[string] tools;
+    bool hermetic;
     bool serial;
     bool sandbox = true;
     JSONValue toJSON() @safe
@@ -52,6 +56,9 @@ class Action
             "settings": JSONValue(settings),
             "cwd": JSONValue(cwd),
             "toolchain": JSONValue(toolchain),
+            "environment": JSONValue(environment),
+            "tools": JSONValue(tools),
+            "hermetic": JSONValue(hermetic),
             "serial": JSONValue(serial),
             "sandbox": JSONValue(sandbox)
         ]);
@@ -80,7 +87,12 @@ class Graph
     string normalize(string path) @safe
     {
         if (isAbsolute(path))
-            return buildNormalizedPath(path);
+        {
+            path = buildNormalizedPath(path);
+            if (path.startsWith(root ~ dirSeparator))
+                return relativePath(path, root).replace("\\", "/");
+            return path;
+        }
         return buildNormalizedPath(path).replace("\\", "/");
     }
 
@@ -108,6 +120,8 @@ class Graph
         }
         if (!action.cwd.length)
             action.cwd = root;
+        if (!action.environment.length)
+            action.environment = buildProcessEnvironment();
         actions[action.name] = action;
     }
 
@@ -198,7 +212,7 @@ class Graph
             ]);
         }
         return JSONValue([
-            "version": JSONValue(1),
+            "version": JSONValue(2),
             "root": JSONValue(root),
             "project": JSONValue(projectName),
             "actions": JSONValue(actions_),
@@ -213,7 +227,7 @@ class Graph
 
     string toDot() @safe
     {
-        string result = "digraph rattpack {\n  // rattpack-v1:" ~ Base64.encode(
+        string result = "digraph rattpack {\n  // rattpack-v2:" ~ Base64.encode(
                 cast(const(ubyte)[]) canonical(toJSON)).idup ~ "\n";
         foreach (path; artifacts.keys.sort)
             result ~= "  " ~ JSONValue(artifacts[path].id)
@@ -237,7 +251,7 @@ class Graph
     {
         try
         {
-            if (document["version"].integer != 1)
+            if (document["version"].integer != 2)
                 fail("E_GRAPH", "unsupported graph version");
             auto graph = new Graph(document["root"].str);
             graph.projectName = document["project"].str;
@@ -253,6 +267,11 @@ class Graph
                 action.cwd = v["cwd"].str;
                 action.settings = v["settings"].str;
                 action.toolchain = v["toolchain"].str;
+                foreach (key, value; v["environment"].objectNoRef)
+                    action.environment[key] = value.str;
+                foreach (key, value; v["tools"].objectNoRef)
+                    action.tools[key] = value.str;
+                action.hermetic = v["hermetic"].type == JSONType.true_;
                 action.serial = v["serial"].type == JSONType.true_;
                 action.sandbox = v["sandbox"].type == JSONType.true_;
                 foreach (command; v["commands"].array)
@@ -291,7 +310,7 @@ class Graph
                 return fromJSON(parseJSON(data));
             foreach (line; data.splitLines)
             {
-                auto marker = line.indexOf("// rattpack-v1:");
+                auto marker = line.indexOf("// rattpack-v2:");
                 if (marker >= 0)
                     return fromJSON(parseJSON(cast(string) Base64.decode(
                             line[cast(size_t) marker + 15 .. $].strip)));

@@ -23,6 +23,7 @@ import std.path;
 import std.random : uniform;
 import std.conv : to;
 import std.json;
+import std.string : replace;
 
 private class Fixture
 {
@@ -315,4 +316,213 @@ unittest
     api.major = 1;
     api.compilerVersion = compilerMajor + 1;
     expectCode("E_PLUGIN_ABI", delegate{ validatePlugin(&api); });
+}
+
+@("initialization preflights scaffold conflicts and preserves template specs")
+unittest
+{
+    import rattpack.config.profiles;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    auto root = buildPath(fixture.root, "starter");
+    mkdirRecurse(root);
+    atomicWrite(buildPath(root, "README.md"), "keep me");
+    expectCode("E_SPEC", { initialize(root, "c-exe", fixture.config, true); });
+    readText(buildPath(root, "README.md")).shouldEqual("keep me");
+    assert(!exists(buildPath(root, "Rattspec")));
+    assert(!exists(buildPath(root, "src")));
+    remove(buildPath(root, "README.md"));
+    atomicWrite(buildPath(root, "Rattspec.in"), "keep template");
+    expectCode("E_SPEC", { initialize(root, "empty", fixture.config); });
+    assert(!exists(buildPath(root, "Rattspec")));
+}
+
+@("shipped scaffolds produce valid graphs and escape project names")
+unittest
+{
+    import rattpack.config.profiles;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    foreach (profile; [
+            "c-exe", "c-lib", "cxx-exe", "cxx-lib", "d-exe", "d-lib", "empty",
+            "monorepo"
+        ])
+    {
+        auto root = buildPath(fixture.root, profile ~ " project");
+        initialize(root, profile, fixture.config, true);
+        auto graph = new SpecLoader(root, fixture.config).load;
+        assert(graph.actions.length);
+        assert(exists(buildPath(root, "Rattpkg")));
+        assert(exists(buildPath(root, "README.md")));
+    }
+    auto root = buildPath(fixture.root, "quoted\"project");
+    initialize(root, "empty", fixture.config, true);
+    new SpecLoader(root, fixture.config).load.projectName.shouldEqual("quoted\"project");
+}
+
+private class QueueProbe : Scheduler
+{
+    import core.sync.mutex : Mutex;
+    import core.sync.condition : Condition;
+    import core.thread : Thread;
+
+    Mutex mutex;
+    Condition changed;
+    Thread coordinator;
+    size_t active, peak;
+    bool bStarted, cStarted;
+    bool handshake;
+    bool failed;
+    string[] visited;
+
+    this(Graph graph, Configuration config, size_t jobs, bool handshake = false)
+    {
+        super(graph, config, jobs);
+        this.handshake = handshake;
+        mutex = new Mutex;
+        changed = new Condition(mutex);
+        coordinator = Thread.getThis;
+    }
+
+    override void executeAction(Action action, void delegate(string) log = null)
+    {
+        import core.time : seconds;
+
+        assert(Thread.getThis !is coordinator, "actions must execute on worker system threads");
+        synchronized (mutex)
+        {
+            active++;
+            if (active > peak)
+                peak = active;
+            visited ~= action.name;
+            if (action.serial)
+                assert(active == 1);
+        }
+        scope (exit)
+            synchronized (mutex)
+            {
+                active--;
+                changed.notifyAll;
+            }
+        synchronized (mutex)
+        {
+            if (failed && action.name == "a")
+                fail("E_ACTION", "intentional worker failure");
+            if (handshake)
+            {
+                if (action.name == "b")
+                    bStarted = true;
+                if (action.name == "c")
+                    cStarted = true;
+                changed.notifyAll;
+                while ((action.name == "a" && !bStarted) || (action.name == "b" && !cStarted))
+                    if (!changed.wait(3.seconds))
+                        fail("E_ACTION", "worker queue did not release a ready dependent action");
+            }
+        }
+        atomicWrite(buildPath(graph.root, action.outputs[0]), action.name);
+    }
+}
+
+private Graph probeGraph(string root)
+{
+    auto graph = new Graph(root);
+    foreach (name; ["a", "b", "c", "serial"])
+    {
+        auto action = new Action;
+        action.name = name;
+        action.outputs = ["build/" ~ name];
+        if (name == "c")
+            action.dependencies = ["a"];
+        if (name == "serial")
+            action.serial = true;
+        graph.add(action);
+    }
+    return graph;
+}
+
+@("system thread queue obeys jobs and releases dependents without a batch barrier")
+unittest
+{
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    auto parallel = new QueueProbe(probeGraph(fixture.root), fixture.config, 2, true);
+    parallel.build.executed.shouldEqual(4);
+    parallel.peak.shouldEqual(2);
+    parallel.jobs.shouldEqual(2);
+    parallel.build.skipped.shouldEqual(4);
+    auto single = new QueueProbe(probeGraph(buildPath(fixture.root, "single")), fixture.config, 1);
+    single.build.executed.shouldEqual(4);
+    single.peak.shouldEqual(1);
+}
+
+@("worker failures stop dependent actions and join the pool")
+unittest
+{
+    import std.algorithm : canFind;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    auto scheduler = new QueueProbe(probeGraph(fixture.root), fixture.config, 2);
+    scheduler.failed = true;
+    expectCode("E_ACTION", { scheduler.build; });
+    scheduler.active.shouldEqual(0);
+    assert(!scheduler.visited.canFind("c"));
+}
+
+@("hermetic actions reject undeclared reads and changes to frozen inputs")
+unittest
+{
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    fixture.put("input", "declared");
+    fixture.put("secret", "undeclared");
+    fixture.put("Rattspec", "project(name: \"strict\", version: \"1\", kind: \"single\")\n"
+            ~ "import \"fs\"\nlet t = rule(name: \"t\", inputs: [\"input\"], output: \"build/t\")\n"
+            ~ "action(t) { fs.write(\"build/t\", fs.read(\"secret\")) }\n");
+    auto graph = new SpecLoader(fixture.root, fixture.config).load;
+    auto scheduler = new Scheduler(graph, fixture.config, 2);
+    scheduler.hermetic = true;
+    expectCode("E_HERMETIC", { scheduler.build; });
+    fixture.put("Rattspec", readText(buildPath(fixture.root, "Rattspec"))
+            .replace("fs.read(\"secret\")", "fs.read(\"input\")"));
+    graph = new SpecLoader(fixture.root, fixture.config).load;
+    scheduler = new Scheduler(graph, fixture.config, 2);
+    scheduler.hermetic = true;
+    scheduler.build.executed.shouldEqual(1);
+    scheduler.build.skipped.shouldEqual(1);
+    fixture.put("input", "changed");
+    expectCode("E_HERMETIC", { scheduler.build; });
+}
+
+@("action environment is explicit, frozen, hashed and round trips")
+unittest
+{
+    import std.process : environment;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    environment["RATTPACK_UNIT_AMBIENT"] = "ambient";
+    scope (exit)
+        environment.remove("RATTPACK_UNIT_AMBIENT");
+    fixture.put("Rattspec", "project(name: \"env\", version: \"1\", kind: \"single\")\n" ~ "import \"fs\"\nimport \"proc\"\nlet t = rule(name: \"t\", output: \"build/t\", env: {DECLARED: \"frozen\"})\n" ~ "action(t) { fs.write(\"build/t\", proc.env(\"DECLARED\") + proc.env(\"RATTPACK_UNIT_AMBIENT\", \"absent\")) }\n");
+    auto graph = new SpecLoader(fixture.root, fixture.config).load;
+    auto restored = Graph.importGraph(graph.toDot);
+    restored.digest.shouldEqual(graph.digest);
+    auto scheduler = new Scheduler(restored, fixture.config, 2);
+    scheduler.hermetic = true;
+    scheduler.build;
+    readText(buildPath(fixture.root, "build/t")).shouldEqual("frozenabsent");
+    auto before = graph.actions["t"].id;
+    graph.actions["t"].environment["DECLARED"] = "changed";
+    graph.finalize;
+    assert(graph.actions["t"].id != before);
 }

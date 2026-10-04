@@ -12,9 +12,11 @@ struct ProcessResult
     string output;
 }
 
-ProcessResult runProcess(string[] argv, string cwd = null, string[string] env = null)
+ProcessResult runProcess(string[] argv, string cwd = null,
+        string[string] env = null, bool inheritEnvironment = true)
 {
-    auto result = execute(argv, env, Config.none, size_t.max, cwd);
+    auto result = execute(argv, env, inheritEnvironment ? Config.none
+            : Config.newEnv, size_t.max, cwd);
     return ProcessResult(result.status, result.output);
 }
 

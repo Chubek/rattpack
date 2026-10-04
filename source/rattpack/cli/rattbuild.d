@@ -6,7 +6,7 @@ import rattpack.config.environment;
 import rattpack.config.profiles;
 import rattpack.graph.model;
 import rattpack.graph.scheduler;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.plugin.abi;
 import rattpack.plugin.loader;
 import rattpack.plugin.exporters;
@@ -41,8 +41,11 @@ int run(string[] args)
             printWarning(code, message, loc);
         };
         auto internalAction = options.positional.length && options.positional[0] == "__run-action";
-        auto config = internalAction ? new Configuration(cast(Value[string]) null) : new Configuration(null,
+        auto config = (internalAction || options.importPath.length) ? new Configuration(
+                cast(Value[string]) null) : new Configuration(null,
                 options.warningsAsErrors, warningSink);
+        if (options.scaffold && !options.initializeProject)
+            fail("E_CLI", "--scaffold requires --init");
         if (options.listProfiles)
         {
             foreach (name; profileNames(config))
@@ -51,7 +54,7 @@ int run(string[] args)
         }
         if (options.initializeProject)
         {
-            initialize(root, options.profile, config);
+            initialize(root, options.profile, config, options.scaffold);
             writeln("created " ~ buildPath(root, "Rattspec"));
             return 0;
         }
@@ -67,6 +70,7 @@ int run(string[] args)
             if (action.settings.length)
                 config = new Configuration(thaw(new Evaluator, action.settings).closure.values);
             auto scheduler = new Scheduler(graph, config, 1);
+            scheduler.hermetic = options.hermetic;
             scheduler.output = (line) { writeln(line); };
             scheduler.runSingle(action, options.incrementalAction);
             if (options.stamp.length)
@@ -79,6 +83,19 @@ int run(string[] args)
             graph = Graph.importGraph(readText(options.importPath));
         else
             graph = new SpecLoader(root, config, options.warningsAsErrors, warningSink).load;
+        if (options.importPath.length && graph.actions.length)
+        {
+            auto names = graph.actions.keys.sort.array;
+            auto settings = graph.actions[names[0]].settings;
+            if (settings.length)
+                config = new Configuration(thaw(new Evaluator, settings).closure.values);
+        }
+        if (options.hermetic)
+        {
+            foreach (action; graph.actions.byValue)
+                action.hermetic = true;
+            graph.finalize(false);
+        }
         if (command == "graph")
         {
             auto data = options.dot ? graph.toDot : canonical(graph.toJSON) ~ "\n";
@@ -138,6 +155,7 @@ int run(string[] args)
             jobs = cast(size_t) configured;
         }
         auto scheduler = new Scheduler(graph, config, jobs);
+        scheduler.hermetic = options.hermetic;
         scheduler.dryRun = options.dryRun;
         scheduler.output = (line) { writeln(line); };
         auto result = scheduler.build(options.positional.length > 1
@@ -162,4 +180,6 @@ private void printWarning(string code, string message, Location loc)
     stderr.writeln(loc.toString ~ ": " ~ code ~ ": " ~ message);
 }
 
-import std.algorithm : canFind;
+import std.algorithm : canFind, sort;
+
+import std.array : array;

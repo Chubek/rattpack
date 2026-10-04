@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import socket
 import socketserver
+import sys
 import subprocess
 import tarfile
 import tempfile
@@ -460,6 +461,111 @@ deps {{
         check("FTP retrieval and archive verification")
 
 
+def test_distribution(work):
+    prefix = work / "installed tools with spaces"
+    run([sys.executable, ROOT / "tools/install.py", "--prefix", prefix, "--with-plugins"])
+    installed = prefix / "bin"
+    for app in ("rattbuild", "rattpkg", "rattsc"):
+        assert "0.1.0" in run([installed / app, "--version"], cwd=work).stdout
+    assert "42" in run([installed / "rattsc", "-e", "print(6 * 7)"], cwd=work).stdout
+    assert (prefix / "share/rattpack/templates/scaffold/Rattpkg.in").is_file()
+    for profile in ("c-exe", "c-lib", "cxx-exe", "cxx-lib", "d-exe", "d-lib", "empty", "monorepo"):
+        project = work / (profile + " starter")
+        run([installed / "rattbuild", "--init", "--scaffold", "--profile=" + profile, "-C", project])
+        run([installed / "rattbuild", "build", "--warnings-as-errors", "-C", project, "-j", "2"])
+        assert "0 built" in run([installed / "rattbuild", "build", "-C", project]).stdout
+        run([installed / "rattpkg", "resolve", "-C", project])
+        run([installed / "rattpkg", "verify", "-C", project])
+        if profile.endswith("-exe"):
+            assert run([project / "build" / project.name]).stdout == "Hello from Rattpack!\n"
+    project = work / "c-exe starter"
+    destination = work / "installed-plugin-export"
+    run([installed / "rattbuild", "export", "-C", project, "--to=" + str(installed / "plugins/ninja.so"), "-o", destination])
+    run(["ninja", "-C", destination])
+    check("installed CLIs, runtime and plugin work outside checkout; all eight scaffolds build")
+
+
+def test_parallel_and_hermetic(work):
+    script = '''import json, pathlib, time
+import sys
+start = time.monotonic_ns()
+time.sleep(0.15)
+pathlib.Path(sys.argv[1]).write_text(json.dumps([start, time.monotonic_ns()]))
+'''
+    for jobs in (1, 2, 4):
+        project = work / ("jobs-" + str(jobs))
+        source = 'project(name: "jobs", version: "1", kind: "single")\n'
+        for i in range(6):
+            argv = json.dumps([sys.executable, "-c", script, "build/" + str(i)])
+            source += f'rule(name: "job{i}", output: "build/{i}", command: {argv})\n'
+        spec(project, source)
+        run([BUILD / "rattbuild", "build", "-C", project, "-j", str(jobs)])
+        events = []
+        for i in range(6):
+            start, end = json.loads((project / "build" / str(i)).read_text())
+            events.extend([(start, 1), (end, -1)])
+        active = peak = 0
+        for _, delta in sorted(events):
+            active += delta
+            peak = max(peak, active)
+        assert peak == jobs, (jobs, peak)
+    check("CLI -j 1, 2 and 4 bounds actual concurrent process actions")
+
+    project = work / "hermetic"
+    put(project, "input", "frozen input")
+    put(project, "secret", "undeclared")
+    spec(project, '''project(name: "strict", version: "1", kind: "single")
+import "fs"
+import "proc"
+let t = rule(name: "t", inputs: ["input"], output: "build/t", env: {DECLARED: "frozen"})
+action(t) { fs.write("build/t", fs.read("input") + proc.env("DECLARED") + proc.env("RATTPACK_INTEGRATION_LEAK", "absent")) }
+''')
+    frozen = put(work, "strict.json", run([BUILD / "rattbuild", "graph", "--hermetic", "-C", project]).stdout)
+    environment["RATTPACK_INTEGRATION_LEAK"] = "ambient"
+    (project / "Rattspec").unlink()
+    config = Path(environment["XDG_CONFIG_HOME"]) / "rattpack/Config.toml"
+    config.write_text("[invalid config")
+    run([BUILD / "rattbuild", "build", "--import", frozen, "-j", "2"])
+    assert (project / "build/t").read_text() == "frozen inputfrozenabsent"
+    put(project, "input", "changed")
+    assert "E_HERMETIC" in run([BUILD / "rattbuild", "build", "--import", frozen], ok=False).stdout
+    config.unlink()
+    environment.pop("RATTPACK_INTEGRATION_LEAK")
+    check("frozen hermetic graph ignores ambient config/environment and rejects changed sources")
+
+    project = work / "isolated-process"
+    source = '''import pathlib, socket
+try:
+    pathlib.Path("secret").read_text()
+except FileNotFoundError:
+    pass
+else:
+    raise AssertionError("undeclared file was visible")
+sock = socket.socket()
+sock.settimeout(0.2)
+try:
+    sock.connect(("127.0.0.1", 9))
+except OSError:
+    pass
+else:
+    raise AssertionError("network connection succeeded")
+pathlib.Path("build/result").write_text("isolated")
+'''
+    put(project, "secret", "undeclared")
+    spec(project, 'project(name: "isolation", version: "1", kind: "single")\n'
+         + 'rule(name: "isolate", output: "build/result", command: '
+         + json.dumps([sys.executable, "-c", source]) + ")\n")
+    result = subprocess.run([str(BUILD / "rattbuild"), "build", "--hermetic", "-C", str(project)],
+                            env=environment, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+    if result.returncode:
+        assert "E_HERMETIC" in result.stdout, result.stdout
+        assert not (project / "build/result").exists()
+        check("strict subprocess isolation fails closed when OS isolation is unavailable")
+    else:
+        assert (project / "build/result").read_text() == "isolated"
+        check("strict subprocess isolation hides undeclared files and disables network")
+
+
 def main():
     for tool in ("cmake", "ninja", "make", "meson"):
         if not shutil.which(tool):
@@ -472,6 +578,8 @@ def main():
         test_builds(work)
         test_exporters(work)
         test_profiles_and_identity(work)
+        test_distribution(work)
+        test_parallel_and_hermetic(work)
         test_packages(work)
     print(f"{count} integration scenarios passed")
 

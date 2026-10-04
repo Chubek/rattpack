@@ -1,0 +1,79 @@
+"""Installation checks without a D compiler or administrator privileges."""
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("installer", ROOT / "tools/install.py")
+installer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(installer)
+
+
+class InstallationTests(unittest.TestCase):
+    def setUp(self):
+        self.work = tempfile.TemporaryDirectory()
+        self.addCleanup(self.work.cleanup)
+        self.root = Path(self.work.name)
+        self.build = self.root / "build"
+        self.build.mkdir()
+        suffix, library, _ = installer.platform_names()
+        for name in [app + suffix for app in installer.APPLICATIONS] + [library]:
+            (self.build / name).write_bytes(b"new payload")
+
+    def test_missing_runtime_does_not_create_destination(self):
+        (self.build / installer.platform_names()[1]).unlink()
+        destination = self.root / "install"
+        self.assertEqual(installer.main(["--build-dir", str(self.build), "--prefix", str(destination)]), 1)
+        self.assertFalse(destination.exists())
+
+    def test_install_layout_and_upgrade_preserve_unmanaged_files(self):
+        destination = self.root / "prefix with spaces"
+        plan = installer.installation_plan(self.build)
+        installer.install(plan, destination)
+        (destination / "custom.conf").write_text("keep")
+        for app in installer.APPLICATIONS:
+            self.assertEqual((destination / "bin" / (app + installer.platform_names()[0])).read_bytes(), b"new payload")
+        self.assertTrue((destination / "share/rattpack/templates/scaffold/Rattpkg.in").is_file())
+        installer.install(plan, destination)
+        self.assertEqual((destination / "custom.conf").read_text(), "keep")
+
+    def test_dry_run_does_not_write(self):
+        destination = self.root / "preview"
+        self.assertEqual(installer.main(["--build-dir", str(self.build), "--prefix", str(destination), "--dry-run"]), 0)
+        self.assertFalse(destination.exists())
+
+    def test_destdir_preserves_prefix_layout(self):
+        prefix = self.root / "prefix"
+        stage = self.root / "stage"
+        self.assertEqual(installer.staged_prefix(prefix, stage), stage.joinpath(*prefix.parts[1:]))
+
+    def test_directory_conflict_is_preflighted(self):
+        destination = self.root / "install"
+        (destination / "bin/rattsc").mkdir(parents=True)
+        with self.assertRaises(ValueError):
+            installer.install([(self.build / "rattbuild", Path("bin/rattbuild")),
+                               (self.build / "rattsc", Path("bin/rattsc"))], destination)
+        self.assertFalse((destination / "bin/rattbuild").exists())
+
+    def test_failed_publication_rolls_back_previous_files(self):
+        destination = self.root / "install"
+        (destination / "bin").mkdir(parents=True)
+        (destination / "bin/first").write_text("old")
+        plan = [(self.build / (installer.APPLICATIONS[0] + installer.platform_names()[0]), Path("bin/first")),
+                (self.build / (installer.APPLICATIONS[1] + installer.platform_names()[0]), Path("bin/second"))]
+        real_replace = installer.os.replace
+        def replace(source, target):
+            if Path(target).name == "second":
+                raise PermissionError("injected publication failure")
+            return real_replace(source, target)
+        with patch.object(installer.os, "replace", side_effect=replace):
+            with self.assertRaises(PermissionError):
+                installer.install(plan, destination)
+        self.assertEqual((destination / "bin/first").read_text(), "old")
+        self.assertFalse((destination / "bin/second").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,8 @@
+# @{dirname}
+
+Build with `rattbuild build --warnings-as-errors`.
+Inspect the build with `rattbuild graph --dot`.
+Export with `rattbuild export --to=ninja -o build/ninja`.
+
+Declare dependencies in `Rattpkg`, then run `rattpkg resolve`.
+Commit `Rattpkg.lock` for applications; omit it for libraries.

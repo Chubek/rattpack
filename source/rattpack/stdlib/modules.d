@@ -4,7 +4,7 @@ import rattpack.script.evaluator;
 import rattpack.script.value;
 import rattpack.config.environment;
 import rattpack.config.templating;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.diagnostic;
 import rattpack.rt.sys;
 import std.file;
@@ -21,7 +21,7 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
             [
                 "cwd": Value.path(evaluator.cwd),
                 "dirname": Value(baseName(evaluator.cwd))
-    ], file);
+    ], file, evaluator.hermetic, evaluator.readableFiles ~ evaluator.writableFiles);
     evaluator.moduleLoader = (string name, Location loc) {
         if (auto value = name in evaluator.modules)
             return *value;
@@ -33,25 +33,33 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
 
         string resolve(Value value, Location l)
         {
-            return buildNormalizedPath(absolutePath(value.text(l), evaluator.cwd));
+            auto path = buildNormalizedPath(absolutePath(value.text(l), evaluator.cwd));
+            return path;
         }
 
         switch (name)
         {
         case "fs":
-            add("exists", (a, l) => Value(exists(resolve(a.get("path", 0), l))));
-            add("is_file", (a, l) => Value(exists(resolve(a.get("path", 0),
+            string readPath(Value value, Location l)
+            {
+                auto path = resolve(value, l);
+                evaluator.requireRead(path, l);
+                return path;
+            }
+
+            add("exists", (a, l) => Value(exists(readPath(a.get("path", 0), l))));
+            add("is_file", (a, l) => Value(exists(readPath(a.get("path", 0),
                     l)) && isFile(resolve(a.get("path", 0), l))));
-            add("is_dir", (a, l) => Value(exists(resolve(a.get("path", 0),
+            add("is_dir", (a, l) => Value(exists(readPath(a.get("path", 0),
                     l)) && isDir(resolve(a.get("path", 0), l))));
             add("read", (a, l) {
-                auto path = resolve(a.get("path", 0), l);
+                auto path = readPath(a.get("path", 0), l);
                 auto text = readText(path);
                 if (path.endsWith(".in"))
                     text = evaluator.sourceTransform(text, path);
                 return Value(text);
             });
-            add("hash", (a, l) => Value(hashFile(resolve(a.get("path", 0), l))));
+            add("hash", (a, l) => Value(hashFile(readPath(a.get("path", 0), l))));
             add("glob", (a, l) {
                 auto pattern = a.get("pattern", 0).text(l).replace("\\", "/");
                 auto wildcard = pattern.indexOfAny("*?");
@@ -60,7 +68,8 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
                 auto searchRoot = slash < 0 ? evaluator.cwd
                     : absolutePath(prefix[0 .. cast(size_t) slash], evaluator.cwd);
                 Value[] paths;
-                foreach (file; sortedFiles(searchRoot))
+                foreach (file; evaluator.hermetic ? evaluator.readableFiles
+                    : sortedFiles(searchRoot))
                 {
                     auto relative = relativePath(file, evaluator.cwd).replace("\\", "/");
                     if (relative.split('/').any!(p => p.startsWith(".")))
@@ -78,7 +87,7 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
             }, true);
             add("mkdir", (a, l) {
                 auto path = resolve(a.get("path", 0), l);
-                evaluator.requireWrite(path, l);
+                evaluator.requireWrite(path, l, true);
                 mkdirRecurse(path);
                 return Value.init;
             }, true);
@@ -86,7 +95,7 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
                 auto dest = resolve(a.get("destination", 1), l);
                 evaluator.requireWrite(dest, l);
                 mkdirRecurse(dirName(dest));
-                copy(resolve(a.get("source", 0), l), dest);
+                copy(readPath(a.get("source", 0), l), dest);
                 return Value.init;
             }, true);
             add("remove", (a, l) {
@@ -140,12 +149,17 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
                     "output": Value(result.output)
                 ]);
             }, true);
-            add("which", (a, l) => Value.path(locateProgram(a.get("name", 0).text(l))));
+            add("which", (a, l) => Value.path(evaluator.environmentFrozen
+                    ? findProgram(a.get("name", 0).text(l),
+                    evaluator.processEnvironment.get("PATH", "")) : locateProgram(a.get("name",
+                    0).text(l))));
             add("env", (a, l) {
                 import std.process : environment;
 
-                return Value(environment.get(a.get("name", 0).text(l),
-                    a.get("default", 1, Value("")).text(l)));
+                auto name = a.get("name", 0).text(l);
+                auto fallback = a.get("default", 1, Value("")).text(l);
+                return Value(evaluator.environmentFrozen ? evaluator.processEnvironment.get(name,
+                    fallback) : environment.get(name, fallback));
             }, true);
             break;
         case "str":
@@ -194,6 +208,8 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
             functions["runtime_library"] = Value((backendName == "win32"
                     ? "rattpack" : "librattpack") ~ sharedSuffix);
             add("discover", (a, l) {
+                if (evaluator.hermetic)
+                    fail("E_HERMETIC", "discover toolchains during graph construction", l);
                 auto language = a.get("language", 0).text(l);
                 auto command = config.text("toolchain." ~ language,
                     language == "d" ? "ldc2" : language == "cxx" ? "c++" : "cc");

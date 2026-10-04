@@ -1,0 +1,3 @@
+# test: hermetic
+project(name: "strict", version: "1", kind: "single")
+rule(name: "escape", output: "build/escape", command: ["true"], sandbox: false)

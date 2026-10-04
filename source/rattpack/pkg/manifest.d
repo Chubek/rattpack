@@ -5,7 +5,7 @@ import rattpack.script.value;
 import rattpack.stdlib.modules;
 import rattpack.config.environment;
 import rattpack.config.templating;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.diagnostic;
 import std.file;
 import std.path;

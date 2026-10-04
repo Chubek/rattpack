@@ -7,7 +7,7 @@ import rattpack.config.environment;
 import rattpack.config.templating;
 import rattpack.stdlib.modules;
 import rattpack.graph.model;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.diagnostic;
 import rattpack.rt.sys;
 import std.file;
@@ -328,6 +328,14 @@ class SpecLoader
             settings.values = configuration.values;
             action.settings = freeze(DeferredAction(Value.init, null, settings));
             action.sandbox = fields.get("sandbox", Value(true)).truth;
+            action.environment = buildProcessEnvironment();
+            if (auto environment = "env" in fields)
+            {
+                if (environment.kind != Value.Kind.map)
+                    fail("E_TYPE", "action env must be a map");
+                foreach (key, value; environment.data.mapValue.values)
+                    action.environment[key] = value.text;
+            }
             action.toolchain = fields.get("toolchain", Value("")).str;
             foreach (key; ["sources", "inputs", "headers", "raw_inputs"])
                 if (auto values = key in fields)
@@ -362,9 +370,12 @@ class SpecLoader
                 {
                     auto program = locateProgram(argv[0]);
                     if (program.length)
+                    {
+                        action.commands[$ - 1][0] = program;
                         action.toolchain = hashParts([
-                        action.toolchain, compilerFingerprint(program)
-                    ]);
+                            action.toolchain, compilerFingerprint(program)
+                        ]);
+                    }
                 }
             }
             else if (definition.kind != "rule" && !definition.deferred.length)
@@ -388,6 +399,28 @@ class SpecLoader
             }
             if (!action.commands.length && !action.snapshot.length)
                 fail("E_TARGET", "target has no action: " ~ action.name);
+            foreach (command_; action.commands)
+                if (command_.length)
+                {
+                    auto program = locateProgram(command_[0]);
+                    if (program.length)
+                        action.tools[program] = hashFile(program);
+                }
+            if (action.snapshot.length)
+                foreach (language; ["c", "cxx", "d"])
+                {
+                    auto program = locateProgram(configuration.text("toolchain." ~ language));
+                    if (program.length)
+                        action.tools[program] = hashFile(program);
+                }
+            if (auto tools = "tools" in fields)
+                foreach (tool; tools.items)
+                {
+                    auto program = locateProgram(tool.text);
+                    if (!program.length)
+                        fail("E_TARGET", "action tool not found: " ~ tool.text);
+                    action.tools[program] = hashFile(program);
+                }
             graph.add(action);
         }
     }

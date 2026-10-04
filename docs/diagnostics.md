@@ -17,6 +17,7 @@ errors. `--warnings-as-errors` promotes warnings without changing their codes.
 | `E_SPEC` | Invalid/missing project metadata or no declared targets. Supply a root identity and at least one target. | `e-spec.ratt` |
 | `E_TARGET` | Invalid/duplicate target, conflicting output, missing source/compiler, or unresolved dependency. | `e-target.ratt` |
 | `E_CYCLE` | The build DAG contains a cycle. Remove the circular dependency. | `e-cycle.ratt` |
+| `E_HERMETIC` | Strict execution found an undeclared input/output/tool, changed frozen input/tool, an isolation failure, or an unsandboxed action. | `e-hermetic.ratt` |
 | `E_ACTION` | A command failed, an output was not produced, or an action violated its write scope. | `e-action.ratt` |
 | `E_GRAPH` | Invalid graph format/version, inconsistent content identities, or exporter failure. Re-export the graph. | `e-graph.ratt` |
 | `E_CONFIG` | Malformed TOML/YAML or an invalid configuration value. Correct the config file. | `e-config.ratt` |

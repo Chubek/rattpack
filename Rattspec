@@ -17,7 +17,7 @@ let native = fs.glob("third_party/blake3/c/*") + fs.glob("third_party/libgit2/sr
 let runtime = rule(name: "librattpack", output: "build/" + toolchain.runtime_library,
   inputs: fs.glob("source/rattpack/**/*.d") + fs.glob("stdlib/*.ratt") +
     ["runtime/dub.sdl", "dub.sdl", "dub.selections.json", "tools/dogfood.py", "tools/build-native.py", "tools/native/CMakeLists.txt", "source/rattpack/native/bridge.c"],
-  raw_inputs: fs.glob("profiles/*.in") + native,
+  raw_inputs: fs.glob("profiles/*.in") + fs.glob("templates/scaffold/*") + native,
   command: [python, "tools/dogfood.py", "--compiler", compiler.command, "library"],
   toolchain: compiler.fingerprint, sandbox: false)
 for app in ["rattbuild", "rattpkg", "rattsc"] {

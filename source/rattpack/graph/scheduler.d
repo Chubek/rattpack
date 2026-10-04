@@ -1,7 +1,7 @@
 module rattpack.graph.scheduler;
 
 import rattpack.graph.model;
-import rattpack.graph.hash;
+import rattpack.content.hash;
 import rattpack.script.snapshot;
 import rattpack.script.evaluator;
 import rattpack.stdlib.modules;
@@ -14,7 +14,8 @@ import std.algorithm;
 import std.parallelism;
 import std.array : array;
 import msgpack;
-import containers.dynamicarray : DynamicArray;
+import core.sync.mutex : Mutex;
+import core.sync.condition : Condition;
 
 struct CacheEntry
 {
@@ -34,6 +35,7 @@ class Scheduler
     Configuration configuration;
     size_t jobs;
     bool dryRun;
+    bool hermetic;
     void delegate(string) output;
     this(Graph graph, Configuration configuration, size_t jobs = 0)
     {
@@ -49,9 +51,13 @@ class Scheduler
 
     BuildResult build(string[] targets = null)
     {
-        graph.finalize;
+        bool strict = hermetic;
+        foreach (action; graph.actions.byValue)
+            strict = strict || action.hermetic;
+        graph.finalize(!strict);
         auto pending = graph.ordered(targets);
-        jobs = min(jobs, max(cast(size_t) 1, pending.length));
+        foreach (action; pending)
+            validateHermetic(action);
         bool[string] done;
         BuildResult result;
         auto cachePath = buildPath(cacheDirectory, "cache.msgpack");
@@ -65,104 +71,131 @@ class Scheduler
             {
                 cache = null;
             }
-        auto pool = new TaskPool(jobs > 1 ? jobs : 1);
+        auto workerCount = min(jobs, max(cast(size_t) 1, pending.length));
+        auto pool = new TaskPool(workerCount);
         scope (exit)
             pool.finish;
-        while (pending.length)
+        auto mutex = new Mutex;
+        auto completed = new Condition(mutex);
+        bool[] started, finished, collected;
+        started.length = finished.length = collected.length = pending.length;
+        Throwable[] errors;
+        errors.length = pending.length;
+        string[] logs, keys;
+        logs.length = keys.length = pending.length;
+        size_t active, remaining = pending.length;
+        bool serialActive;
+        void worker(size_t index)
         {
-            DynamicArray!Action runnable;
-            Action[] remaining;
-            foreach (action; pending)
+            try
             {
-                bool available = true;
-                foreach (name; graph.prerequisites(action))
-                    if (!done.get(name, false))
-                        available = false;
-                if (available && runnable.length < jobs && (!action.serial
-                        || !runnable.length) && (!runnable.length || !runnable[0].serial))
-                    runnable.insertBack(action);
-                else
-                    remaining ~= action;
+                executeAction(pending[index], (line) { logs[index] ~= line ~ "\n"; });
             }
-            auto ready = runnable[];
-            if (!ready.length)
-                fail("E_CYCLE", "scheduler has no runnable actions");
-            bool[] run;
-            run.length = ready.length;
-            string[] keys;
-            keys.length = ready.length;
-            foreach (i, action; ready)
+            catch (Throwable error)
             {
-                string[] parts = [action.id];
-                foreach (path; action.inputs)
-                    parts ~= hashFile(absolutePath(path, graph.root));
-                keys[i] = hashParts(parts);
-                bool current;
-                if (auto entry = action.name in cache)
-                {
-                    current = entry.recipe == keys[i];
-                    foreach (path; action.outputs)
-                        if (!exists(absolutePath(path, graph.root))
-                                || entry.outputs.get(path,
-                                    "") != hashFile(absolutePath(path, graph.root)))
-                            current = false;
-                }
-                run[i] = !current;
-                if (current)
-                    result.skipped++;
-                else
-                {
-                    result.executed++;
-                    if (output !is null)
-                        output((dryRun ? "would build " : "build ") ~ action.name);
-                }
+                errors[index] = error;
             }
-            Exception[] errors;
-            errors.length = ready.length;
-            string[] logs;
-            logs.length = ready.length;
-            foreach (i; pool.parallel(iota(ready.length), 1))
+            synchronized (mutex)
             {
-                if (!run[i] || dryRun)
-                    continue;
-                try
-                {
-                    executeAction(ready[i], (line) { logs[i] ~= line ~ "\n"; });
-                }
-                catch (Exception e)
-                {
-                    errors[i] = e;
-                }
+                finished[index] = true;
+                completed.notifyAll;
             }
-            foreach (i, action; ready)
+        }
+
+        while (remaining)
+        {
+            synchronized (mutex)
             {
-                if (logs[i].length && output !is null)
-                    output(logs[i].stripRight);
-                if (errors[i]!is null)
-                    throw errors[i];
-                done[action.name] = true;
-                if (run[i] && !dryRun)
+                foreach (i, action; pending)
+                    if (finished[i] && !collected[i])
+                    {
+                        collected[i] = true;
+                        active--;
+                        remaining--;
+                        if (action.serial)
+                            serialActive = false;
+                        if (logs[i].length && output !is null)
+                            output(logs[i].stripRight);
+                        if (errors[i]!is null)
+                            throw errors[i];
+                        CacheEntry entry;
+                        entry.recipe = keys[i];
+                        foreach (path; action.outputs)
+                        {
+                            auto absolute = absolutePath(path, graph.root);
+                            if (!exists(absolute))
+                                fail("E_ACTION", "action did not produce " ~ path);
+                            entry.outputs[path] = hashFile(absolute);
+                        }
+                        cache[action.name] = entry;
+                        atomicWrite(cachePath, pack(cache));
+                        done[action.name] = true;
+                    }
+                foreach (i, action; pending)
                 {
-                    CacheEntry entry;
-                    entry.recipe = keys[i];
-                    foreach (path; action.outputs)
+                    if (started[i] || serialActive || active >= workerCount)
+                        continue;
+                    bool available = true;
+                    foreach (name; graph.prerequisites(action))
+                        if (!done.get(name, false))
+                            available = false;
+                    if (!available || (action.serial && active))
+                        continue;
+                    string[] parts = [action.id];
+                    foreach (path; action.inputs)
                     {
                         auto absolute = absolutePath(path, graph.root);
-                        if (!exists(absolute))
-                            fail("E_ACTION", "action did not produce " ~ path);
-                        entry.outputs[path] = hashFile(absolute);
+                        parts ~= dryRun && !exists(absolute) && graph.artifacts[path].producer.length
+                            ? graph.artifacts[path].id : hashFile(absolute);
                     }
-                    cache[action.name] = entry;
-                    atomicWrite(cachePath, pack(cache));
+                    keys[i] = hashParts(parts);
+                    bool current;
+                    if (auto entry = action.name in cache)
+                    {
+                        current = entry.recipe == keys[i];
+                        foreach (path; action.outputs)
+                            if (!exists(absolutePath(path, graph.root))
+                                    || entry.outputs.get(path,
+                                        "") != hashFile(absolutePath(path, graph.root)))
+                                current = false;
+                    }
+                    started[i] = true;
+                    if (current || dryRun)
+                    {
+                        if (current)
+                            result.skipped++;
+                        else
+                        {
+                            result.executed++;
+                            if (output !is null)
+                                output("would build " ~ action.name);
+                        }
+                        collected[i] = true;
+                        remaining--;
+                        done[action.name] = true;
+                        continue;
+                    }
+                    result.executed++;
+                    if (output !is null)
+                        output("build " ~ action.name);
+                    active++;
+                    serialActive = action.serial;
+                    // put() executes exclusively on the pool's system threads.
+                    // The coordinator never participates as an extra worker.
+                    pool.put(task(&worker, i));
                 }
+                if (remaining && !active)
+                    fail("E_CYCLE", "scheduler has no runnable actions");
+                if (active)
+                    completed.wait;
             }
-            pending = remaining;
         }
         return result;
     }
 
     void runSingle(Action action, bool incremental)
     {
+        validateHermetic(action);
         auto path = buildPath(cacheDirectory, "export", hashBytes(action.name) ~ ".msgpack");
         CacheEntry entry;
         if (incremental && exists(path))
@@ -197,12 +230,52 @@ class Scheduler
             atomicWrite(path, pack(entry));
     }
 
+    private void validateHermetic(Action action)
+    {
+        if (!hermetic && !action.hermetic)
+            return;
+        if (!action.sandbox)
+            fail("E_HERMETIC", "hermetic execution rejects sandbox: false for " ~ action.name);
+        foreach (path; action.inputs)
+            if (!graph.artifacts[path].producer.length)
+            {
+                auto absolute = absolutePath(path, graph.root);
+                if (!exists(absolute) || hashFile(absolute) != graph.artifacts[path].contentHash)
+                    fail("E_HERMETIC", "frozen graph input changed: " ~ path);
+            }
+        foreach (tool, fingerprint; action.tools)
+            if (!exists(tool) || hashFile(tool) != fingerprint)
+                fail("E_HERMETIC", "frozen graph tool changed: " ~ tool);
+    }
+
     void executeAction(Action action, void delegate(string) log = null)
     {
-        string[] writable;
+        auto strict = hermetic || action.hermetic;
+        if (strict && !action.sandbox)
+            fail("E_HERMETIC", "hermetic execution rejects sandbox: false for " ~ action.name);
+        string[] readable;
+        string[] inputHashes;
+        foreach (path; action.inputs)
+        {
+            auto absolute = buildNormalizedPath(absolutePath(path, graph.root));
+            readable ~= absolute;
+            inputHashes ~= hashFile(absolute);
+            if (strict && !graph.artifacts[path].producer.length
+                    && graph.artifacts[path].contentHash != inputHashes[$ - 1])
+                fail("E_HERMETIC", "frozen graph input changed: " ~ path);
+        }
+        if (strict)
+            foreach (tool, fingerprint; action.tools)
+                if (!exists(tool) || hashFile(tool) != fingerprint)
+                    fail("E_HERMETIC", "frozen graph tool changed: " ~ tool);
+        string[] writable, outputs;
         foreach (path; action.outputs)
         {
-            auto directory = dirName(absolutePath(path, graph.root));
+            auto absolute = buildNormalizedPath(absolutePath(path, graph.root));
+            if (strict && !absolute.startsWith(graph.root ~ dirSeparator))
+                fail("E_HERMETIC", "hermetic outputs must be inside the project: " ~ path);
+            outputs ~= absolute;
+            auto directory = dirName(absolute);
             mkdirRecurse(directory);
             writable ~= directory;
         }
@@ -215,8 +288,37 @@ class Scheduler
                 rmdirRecurse(temporary);
         ProcessResult run(string[] command, string cwd)
         {
+            if (strict)
+            {
+                auto program = findProgram(command[0], action.environment.get("PATH", ""));
+                if (!(program in action.tools))
+                    fail("E_HERMETIC", "undeclared action tool: " ~ command[0]);
+                auto argv = command.dup;
+                argv[0] = program;
+                auto result = runHermetic(argv, cwd, writable, temporary,
+                        readable ~ action.tools.keys, action.environment);
+                if (!result.status)
+                    foreach (i, directory; writable)
+                        foreach (file; outputs)
+                            if (dirName(file) == directory)
+                            {
+                                import std.conv : to;
+
+                                auto stage = buildPath(temporary, "outputs",
+                                        i.to!string, baseName(file));
+                                if (exists(stage))
+                                {
+                                    if (!isFile(stage) || isSymlink(stage))
+                                        fail("E_HERMETIC",
+                                                "action output must be a regular file: " ~ file);
+                                    atomicWrite(file, read(stage));
+                                    setExecutable(file, executableFile(stage));
+                                }
+                            }
+                return result;
+            }
             return action.sandbox ? runSandboxed(command, cwd, writable,
-                    temporary) : runProcess(command, cwd);
+                    temporary, action.environment) : runProcess(command, cwd);
         }
 
         foreach (command; action.commands)
@@ -236,6 +338,11 @@ class Scheduler
                 config = new Configuration(settings.closure.values);
             }
             auto evaluator = new Evaluator(Phase.execution, action.cwd);
+            evaluator.hermetic = strict;
+            evaluator.readableFiles = readable;
+            evaluator.writableFiles = outputs;
+            evaluator.environmentFrozen = action.sandbox;
+            evaluator.processEnvironment = action.environment;
             installStdlib(evaluator, config);
             if (action.sandbox)
                 evaluator.writeRoots = writable;
@@ -248,8 +355,11 @@ class Scheduler
             auto deferred = thaw(evaluator, action.snapshot);
             evaluator.execute(deferred.body, new Environment(deferred.closure));
         }
+        if (strict)
+            foreach (i, input; readable)
+                if (hashFile(input) != inputHashes[i])
+                    fail("E_HERMETIC", "action input changed during execution: " ~ input);
     }
 }
 
-import std.range : iota;
 import std.string : stripRight;

@@ -10,9 +10,11 @@ import std.string;
 import std.json : JSONValue;
 
 string preprocess(string input, Configuration config, Value[string] extra = null,
-        string file = "<template>")
+        string file = "<template>", bool hermetic = false, string[] readableFiles = null)
 {
     auto evaluator = new Evaluator(Phase.construction, extra.get("cwd", Value.path(".")).text);
+    evaluator.hermetic = hermetic;
+    evaluator.readableFiles = readableFiles;
     installStdlib(evaluator, config);
     evaluator.globals.values["env"] = evaluator.importModule("env", Location(file));
     // Nested config maps support @{user.name} as well as env.get(...).

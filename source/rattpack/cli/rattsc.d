@@ -163,6 +163,7 @@ private void diagnosticScenario(string source, string file, void delegate(string
     {
     case "spec":
     case "build":
+    case "hermetic":
     case "identity":
     case "nested":
         auto identitySpec = "project(name: \"root\", version: \"1.0.0\", kind: \"single\")\n"
@@ -175,8 +176,12 @@ private void diagnosticScenario(string source, string file, void delegate(string
                     "project(name: \"nested\", version: \"1.0.0\", kind: \"single\")\n"
                     ~ "rule(name: \"child\", output: \"build/child\", command: [\"true\"])");
         auto graph = new SpecLoader(root, config, scenario == "nested").load;
-        if (scenario == "build")
-            new Scheduler(graph, config, 1).build;
+        if (scenario == "build" || scenario == "hermetic")
+        {
+            auto scheduler = new Scheduler(graph, config, 1);
+            scheduler.hermetic = scenario == "hermetic";
+            scheduler.build;
+        }
         break;
     case "manifest":
     case "floating":

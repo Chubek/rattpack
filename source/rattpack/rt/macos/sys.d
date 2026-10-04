@@ -61,6 +61,15 @@ version (OSX)
         return findProgram(name, environment.get("PATH", ""));
     }
 
+    string[string] buildProcessEnvironment()
+    {
+        string[string] result = [
+            "PATH": environment.get("PATH", ""), "LANG": "C", "LC_ALL": "C",
+            "TZ": "UTC", "SOURCE_DATE_EPOCH": "0"
+        ];
+        return result;
+    }
+
     string shellQuote(string value) @safe
     {
         import std.string : replace;
@@ -90,7 +99,17 @@ version (OSX)
         return error is null ? "unknown loader error" : error.fromStringz.idup;
     }
 
-    ProcessResult runSandboxed(string[] argv, string cwd, string[] writable, string temporary)
+    ProcessResult runHermetic(string[] argv, string cwd, string[] writable,
+            string temporary, string[] readable, string[string] env)
+    {
+        import rattpack.diagnostic : fail;
+
+        fail("E_HERMETIC", "strict subprocess isolation is unavailable on this backend");
+        return ProcessResult.init;
+    }
+
+    ProcessResult runSandboxed(string[] argv, string cwd, string[] writable,
+            string temporary, string[string] env = null)
     {
         import std.json : JSONValue;
 
@@ -103,9 +122,9 @@ version (OSX)
                 profile ~= "(allow file-write* (subpath " ~ JSONValue(directory).toString ~ "))";
             command = [program, "-p", profile];
         }
-        return runProcess(command ~ argv, cwd, [
-            "TMPDIR": temporary,
-            "PYTHONDONTWRITEBYTECODE": "1"
-        ]);
+        env = env.dup;
+        env["TMPDIR"] = temporary;
+        env["PYTHONDONTWRITEBYTECODE"] = "1";
+        return runProcess(command ~ argv, cwd, env, false);
     }
 }

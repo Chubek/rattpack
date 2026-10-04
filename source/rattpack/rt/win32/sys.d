@@ -92,6 +92,18 @@ version (Windows)
         return findProgram(name, environment.get("PATH", ""));
     }
 
+    string[string] buildProcessEnvironment()
+    {
+        string[string] result = [
+            "PATH": environment.get("PATH", ""), "LANG": "C", "LC_ALL": "C",
+            "TZ": "UTC", "SOURCE_DATE_EPOCH": "0"
+        ];
+        foreach (key; ["SystemRoot", "WINDIR", "COMSPEC", "PATHEXT"])
+            if (auto value = environment.get(key, ""))
+                result[key] = value;
+        return result;
+    }
+
     string shellQuote(string value) @safe
     {
         import std.process : escapeWindowsArgument;
@@ -124,8 +136,21 @@ version (Windows)
         return "Win32 loader error " ~ GetLastError().to!string;
     }
 
-    ProcessResult runSandboxed(string[] argv, string cwd, string[] writable, string temporary)
+    ProcessResult runHermetic(string[] argv, string cwd, string[] writable,
+            string temporary, string[] readable, string[string] env)
     {
-        return runProcess(argv, cwd, ["TEMP": temporary, "TMP": temporary]);
+        import rattpack.diagnostic : fail;
+
+        fail("E_HERMETIC", "strict subprocess isolation is unavailable on this backend");
+        return ProcessResult.init;
+    }
+
+    ProcessResult runSandboxed(string[] argv, string cwd, string[] writable,
+            string temporary, string[string] env = null)
+    {
+        env = env.dup;
+        env["TEMP"] = temporary;
+        env["TMP"] = temporary;
+        return runProcess(argv, cwd, env, false);
     }
 }

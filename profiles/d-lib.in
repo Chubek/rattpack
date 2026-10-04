@@ -1,4 +1,4 @@
-project(name: "@{dirname}", version: "0.1.0", kind: "single")
+project(name: @{dirname_literal}, version: "0.1.0", kind: "single")
 import "fs"
 import "target"
-target.library(name: "@{dirname}", language: "d", sources: fs.glob("src/**/*.d"))
+target.library(name: @{dirname_literal}, language: "d", sources: fs.glob("src/**/*.d"))
