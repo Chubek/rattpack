@@ -37,6 +37,13 @@ Manifest readManifest(string path, Configuration configuration)
 {
     if (!exists(path))
         fail("E_PACKAGE", "manifest not found: " ~ path);
+    return parseManifest(readText(path), path, configuration);
+}
+
+/// Evaluate manifest source without a file on disk. Callers validating generated
+/// or cached text supply the reported filename and its directory context.
+Manifest parseManifest(string source, string path, Configuration configuration)
+{
     auto evaluator = new Evaluator(Phase.construction, dirName(absolutePath(path)));
     installStdlib(evaluator, configuration);
     Manifest manifest;
@@ -61,8 +68,8 @@ Manifest readManifest(string path, Configuration configuration)
         ]));
     }
 
-    foreach (source; ["git", "http", "ftp"])
-        bindSource(source);
+    foreach (kind; ["git", "http", "ftp"])
+        bindSource(kind);
     evaluator.bind("dep", (a, l) {
         Dependency dep;
         dep.name = a.get("name", 0).text(l);
@@ -96,7 +103,6 @@ Manifest readManifest(string path, Configuration configuration)
         manifest.dependencies ~= dep;
         return Value.init;
     });
-    auto source = readText(path);
     evaluator.run(source, absolutePath(path));
     if (!manifest.name.length)
         fail("E_PACKAGE", "Rattpkg must call package()", Location(path));

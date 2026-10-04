@@ -19,13 +19,16 @@ jobs:
       - uses: dlang-community/setup-dlang@v2
         with:
           compiler: ${{ matrix.compiler }}
-      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build meson libssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build meson libssl-dev vim neovim
       - run: dub build -c rattbuild --compiler="$DC"
       - if: matrix.dc == 'ldc2'
         run: ./build/rattbuild build --warnings-as-errors
       - run: dub test --compiler="$DC"
       - run: dub build -c rattsc --compiler="$DC"
       - run: ./build/rattsc --test tests/script
+      - run: dub build -c ratt-language-server --compiler="$DC"
+      - run: python3 tests/addons/run.py
+      - run: dub build -c rattspec --compiler="$DC"
       - if: matrix.dc == 'ldc2'
         run: ./tests/integration/run.sh
       - if: matrix.dc == 'ldc2'

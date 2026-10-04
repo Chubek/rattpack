@@ -27,6 +27,7 @@ errors. `--warnings-as-errors` promotes warnings without changing their codes.
 | `E_FLOATING` | A Git branch was requested without `--allow-floating`. Pin a tag/revision or explicitly allow a branch during resolution. | `e-floating.ratt` |
 | `E_PLUGIN_ABI` | A plugin has an incompatible ABI/compiler, missing entry point, or missing capability. Rebuild with the host compiler. | `e-plugin.ratt` |
 | `E_CLI` | Unknown command or invalid command option combination. Consult `--help`. | `e-cli.ratt` |
+| `E_ASSIST` | OpenCode IPC failed, returned an invalid file proposal, or an input file changed during generation. Check the OpenCode V2 executable/server/model and retry with current files. | `e-assist.ratt` |
 | `W_DUAL_CONFIG` | Both config formats exist; TOML takes precedence. | `w-dual-config.ratt` |
 | `W_UNDECLARED_NESTED_SPEC` | A nested project was not explicitly declared in a monorepo. It shares identity/resources and is serialized. Declare `member`, `vendored`, or `ignore`. | `w-nested.ratt` |
 

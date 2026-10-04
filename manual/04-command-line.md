@@ -183,7 +183,55 @@ nor repairs changed ones. These commands finish with `resolved Rattpkg.lock`,
 There are no `install`, `publish`, `remove`, or `search` package subcommands in
 this release. Package consumption is through already-fetched source trees.
 
-## 4.4 `rattsc`
+## 4.4 `rattspec`
+
+### Synopsis
+
+```text
+rattspec assist REQUEST [-C DIRECTORY] [OPTIONS]
+```
+
+`rattspec` creates and updates the two root files, `Rattspec` and `Rattpkg`, from
+a natural-language request. It requires the `opencode-assist` plugin and OpenCode
+V2 on `PATH`.
+
+| Option | Effect |
+| --- | --- |
+| `-C`, `--directory` | Project directory; default `.` |
+| `--plugin` | Assist plugin path; default `plugins/opencode-assist.*` beside the executable |
+| `--opencode` | OpenCode executable name or path; default `opencode` |
+| `--server` | Explicit OpenCode server URL; default is the CLI's own discovery and authentication |
+| `--model` | `provider/model` or `provider/model#variant`; default is OpenCode's configured model |
+| `--timeout` | IPC deadline in seconds; default 120 |
+| `--dry-run` | Print the validated proposal as JSON and write nothing |
+| `--version` | Print the version and exit |
+
+```sh
+rattspec assist 'add these libraries: fmt and zlib'
+rattspec assist 'build a C library and an executable that links it' -C workspace
+rattspec assist 'make this a monorepo' --dry-run
+```
+
+The command reads the existing `Rattspec`/`Rattpkg` plus a bounded inventory of
+source paths, sends them to OpenCode's `POST /api/experimental/generate` endpoint
+through the `opencode api` CLI, and expects a JSON object of complete replacement
+files. Unchanged files may be omitted; a missing file must be created.
+
+Nothing is written until the whole proposal is validated: each file must parse,
+lint, declare exactly one `project()`/`package()` identity, and declare at least
+one target in a `Rattspec`. A proposed `Rattpkg` is additionally read by the real
+manifest reader, so dependency sources, Git pins, and checksums are host-validated
+rather than trusted. Model output is never evaluated as Rattscript.
+
+Files are written atomically, and only if they still match the content read
+before the request. An edit made while OpenCode was generating raises `E_ASSIST`
+instead of overwriting it. `E_ASSIST` also reports an unreachable executable,
+a failed or timed-out request, and an unusable response.
+
+Assist does not run `rattpkg resolve` and never writes `Rattpkg.lock`. The model's
+summary names any follow-up step it expects.
+
+## 4.5 `rattsc`
 
 ### Synopsis
 

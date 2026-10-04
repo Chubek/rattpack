@@ -10,8 +10,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-APPLICATIONS = ("rattbuild", "rattpkg", "rattsc")
-EXPORTERS = ("cmake", "gnumake", "ninja", "meson")
+APPLICATIONS = ("rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server")
+PLUGINS = ("cmake", "gnumake", "ninja", "meson", "opencode-assist")
 
 
 def platform_names():
@@ -29,10 +29,11 @@ def installation_plan(build, with_plugins=False):
     plan.append((build / library, Path("bin") / library))
     if with_plugins:
         plan.extend((build / "plugins" / (name + plugin_suffix),
-                     Path("bin/plugins") / (name + plugin_suffix)) for name in EXPORTERS)
-    for directory in ("profiles", "templates", "manual", "docs"):
+                     Path("bin/plugins") / (name + plugin_suffix)) for name in PLUGINS)
+    for directory in ("profiles", "templates", "manual", "docs", "addons"):
         plan.extend((path, Path("share/rattpack") / path.relative_to(ROOT))
-                    for path in sorted((ROOT / directory).rglob("*")) if path.is_file())
+                    for path in sorted((ROOT / directory).rglob("*"))
+                    if path.is_file() and "__pycache__" not in path.parts)
     plan.extend((ROOT / name, Path("share/rattpack") / name)
                 for name in ("README.md", "LICENSE"))
     missing = [str(source) for source, _ in plan if not source.is_file()]
@@ -102,10 +103,10 @@ def main(argv=None):
                         help="install prefix (default: ~/.local); applications go in bin")
     parser.add_argument("--destdir", type=Path, help="package staging root prepended to prefix")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build",
-                        help="directory containing all three applications and shared runtime")
+                        help="directory containing the applications, language server and shared runtime")
     parser.add_argument("--build", action="store_true", help="bootstrap all applications with DUB")
     parser.add_argument("--compiler", default=os.environ.get("DC", "ldc2"))
-    parser.add_argument("--with-plugins", action="store_true", help="also install native exporter plugins")
+    parser.add_argument("--with-plugins", action="store_true", help="also install native exporter and assist plugins")
     parser.add_argument("--dry-run", action="store_true", help="print the validated copy plan without writing")
     args = parser.parse_args(argv)
     try:

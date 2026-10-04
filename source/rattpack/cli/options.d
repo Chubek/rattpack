@@ -69,6 +69,31 @@ struct PackageOptions
     @NamedArgument("version") bool version_;
 }
 
+/// Options accepted by the assisted specification editor.
+@(Command("rattspec").Description("Create and update Rattspec and Rattpkg through OpenCode.")
+        .Epilog("Example: rattspec assist 'add these libraries: fmt and zlib'"))
+struct SpecOptions
+{
+    /// Assist command and natural-language request.
+    @(PositionalArgument.Optional) string[] positional;
+    /// Project root directory.
+    @NamedArgument("C", "directory") string directory = ".";
+    /// Native assist plugin; defaults to plugins/opencode-assist beside the CLI.
+    @NamedArgument("plugin") string plugin;
+    /// OpenCode executable name or path.
+    @NamedArgument("opencode") string opencode = "opencode";
+    /// Explicit OpenCode server, using the CLI's authentication context.
+    @NamedArgument("server") string server;
+    /// Optional provider/model#variant; otherwise use OpenCode's default model.
+    @NamedArgument("model") string model;
+    /// IPC deadline in seconds.
+    @NamedArgument("timeout") uint timeout = 120;
+    /// Generate and validate a proposal, printing JSON instead of writing files.
+    @NamedArgument("dry-run") bool dryRun;
+    /// Print the version and exit.
+    @NamedArgument("version") bool version_;
+}
+
 /// Options accepted by the standalone interpreter.
 @(Command("rattsc").Description("Run Rattscript, lint annotations, or start a REPL.")
         .Epilog(

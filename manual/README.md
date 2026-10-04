@@ -22,6 +22,9 @@ The build chapters also describe the current ready-action thread pool, captured
 process environments, graph format v2, and strict `--hermetic` execution.
 Chapter 25 connects these features in a reproducible-build walkthrough.
 
+Editor integration is described in the [add-on guide](../addons/README.md),
+including the bundled static language server and Vim/Neovim/Sublime Text setup.
+
 ## Contents
 
 | Chapter | Subject |
@@ -29,7 +32,7 @@ Chapter 25 connects these features in a reproducible-build walkthrough.
 | [1. Overview and core concepts](01-overview.md) | Components, the project lifecycle, construction and execution, terminology |
 | [2. Installation and building from source](02-installation.md) | Prerequisites, LDC/DMD bootstrap, shared libraries, platform setup |
 | [3. Your first project](03-first-project.md) | A complete C project, initialization, building, incrementality, cleaning |
-| [4. Command-line reference](04-command-line.md) | Every public command and option for all three applications |
+| [4. Command-line reference](04-command-line.md) | Every public command and option for all four applications |
 | [5. The Rattscript language](05-rattscript.md) | Values, expressions, statements, functions, closures, annotations, built-ins |
 | [6. Modules and standard library](06-standard-library.md) | Imports and the complete shipped module API |
 | [7. Projects, targets, and native compilation](07-projects-and-targets.md) | Project declarations, target fields, C/C++/D lowering, dependencies |

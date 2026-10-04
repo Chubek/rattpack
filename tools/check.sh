@@ -8,3 +8,5 @@ dub run dscanner@0.16.0-beta.5 --compiler="$dc" -- --styleCheck source/
 dub test --compiler="$dc"
 dub build -c rattsc --compiler="$dc"
 ./build/rattsc --test tests/script
+dub build -c ratt-language-server --compiler="$dc"
+python3 tests/addons/run.py

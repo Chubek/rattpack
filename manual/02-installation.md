@@ -53,13 +53,15 @@ dub build -c rattbuild --compiler=ldc2
 
 The first command builds the shared runtime and `rattbuild`. The second command
 evaluates Rattpack's own `Rattspec` and builds the runtime and all three command-
-line applications. This is the repository's **self-hosted**, or dogfood, build.
+line applications and the editor language server. This is the repository's
+**self-hosted**, or dogfood, build.
 
 Each application can also be bootstrapped directly:
 
 ```sh
 dub build -c rattpkg --compiler=ldc2
 dub build -c rattsc --compiler=ldc2
+dub build -c ratt-language-server --compiler=ldc2
 ```
 
 The self-hosted build selects its compiler from `toolchain.d` in the Rattpack
@@ -74,6 +76,7 @@ Use DMD consistently for the shared runtime, applications, and plugins:
 dub build -c rattbuild --compiler=dmd
 dub build -c rattpkg --compiler=dmd
 dub build -c rattsc --compiler=dmd
+dub build -c ratt-language-server --compiler=dmd
 ```
 
 For self-hosting, set the following in your configuration before invoking the
@@ -109,6 +112,8 @@ The output directory contains:
 | Build application | `rattbuild` | `rattbuild` | `rattbuild.exe` |
 | Package application | `rattpkg` | `rattpkg` | `rattpkg.exe` |
 | Interpreter | `rattsc` | `rattsc` | `rattsc.exe` |
+| Assisted spec editor | `rattspec` | `rattspec` | `rattspec.exe` |
+| Language server | `ratt-language-server` | `ratt-language-server` | `ratt-language-server.exe` |
 | Shared implementation | `librattpack.so` | `librattpack.dylib` | `rattpack.dll` |
 
 The executables depend on the shared implementation and the compiler's shared D
@@ -124,6 +129,7 @@ export PATH="/absolute/path/to/rattpack/build:$PATH"
 rattbuild --version
 rattpkg --version
 rattsc --version
+rattspec --version
 ```
 
 For PowerShell:
@@ -133,19 +139,25 @@ $env:Path = "C:\path\to\rattpack\build;" + $env:Path
 rattbuild --version
 ```
 
-Install the built applications, shared library, profiles, templates, and manuals
-with the repository installer (defaults to `~/.local`):
+Install the built applications, language server, shared library, profiles,
+templates, manuals, and editor add-ons with the repository installer (defaults
+to `~/.local`):
 
 ```sh
 ./install.sh
 ./install.sh --prefix /path/to/prefix
 ```
 
-Pass `--build` to bootstrap all three applications with DUB before installing,
-and `--compiler=dmd` to select DMD. Prepare the submodules first as described in
+Pass `--build` to bootstrap the applications and language server with DUB before
+installing, and `--compiler=dmd` to select DMD. Prepare the submodules first as described in
 section 2.2. Use `--dry-run` to preview an existing build without copying files;
 `--destdir` stages the prefix for packaging. `--with-plugins` includes the native
-exporters. On Windows, invoke `python tools/install.py` with the same options.
+exporters and the `opencode-assist` plugin. On Windows, invoke
+`python tools/install.py` with the same options.
+
+`rattspec assist` needs the assist plugin, which `--with-plugins` installs into
+`bin/plugins/`. It also needs OpenCode V2 on `PATH`; see
+[chapter 4](04-command-line.md).
 
 ## 2.6 Platform setup
 

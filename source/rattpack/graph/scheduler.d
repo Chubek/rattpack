@@ -74,7 +74,12 @@ class Scheduler
         auto workerCount = min(jobs, max(cast(size_t) 1, pending.length));
         auto pool = new TaskPool(workerCount);
         scope (exit)
-            pool.finish;
+        {
+            // finish(true) can execute queued work on the calling thread. Stop
+            // the queue first, then join actions already running on workers.
+            pool.stop;
+            pool.finish(true);
+        }
         auto mutex = new Mutex;
         auto completed = new Condition(mutex);
         bool[] started, finished, collected;

@@ -212,6 +212,11 @@ private void diagnosticScenario(string source, string file, void delegate(string
     case "cli":
         validateBuildCommand("unknown-command");
         break;
+    case "assist":
+        import rattpack.spec.assist : AssistProject, decodeAssistProposal;
+
+        decodeAssistProposal(source[source.indexOf('\n') + 1 .. $], AssistProject.init);
+        break;
     default:
         fail("E_RUNTIME", "unknown golden scenario: " ~ scenario);
     }

@@ -1,0 +1,1 @@
+runtime! indent/rattscript.vim

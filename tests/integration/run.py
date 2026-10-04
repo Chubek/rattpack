@@ -465,12 +465,16 @@ def test_distribution(work):
     prefix = work / "installed tools with spaces"
     run([sys.executable, ROOT / "tools/install.py", "--prefix", prefix, "--with-plugins"])
     installed = prefix / "bin"
-    for app in ("rattbuild", "rattpkg", "rattsc"):
+    for app in ("rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server"):
         assert "0.1.0" in run([installed / app, "--version"], cwd=work).stdout
     assert "42" in run([installed / "rattsc", "-e", "print(6 * 7)"], cwd=work).stdout
     assert (prefix / "share/rattpack/templates/scaffold/Rattpkg.in").is_file()
+    assert (prefix / "share/rattpack/addons/neovim/ratt-languages/lua/ratt/init.lua").is_file()
+    assert (prefix / "share/rattpack/addons/sublime/plugin.py").is_file()
+    # Exercise spaces in paths while keeping generated package names valid.
+    scaffolds = work / "starter projects with spaces"
     for profile in ("c-exe", "c-lib", "cxx-exe", "cxx-lib", "d-exe", "d-lib", "empty", "monorepo"):
-        project = work / (profile + " starter")
+        project = scaffolds / (profile + "-starter")
         run([installed / "rattbuild", "--init", "--scaffold", "--profile=" + profile, "-C", project])
         run([installed / "rattbuild", "build", "--warnings-as-errors", "-C", project, "-j", "2"])
         assert "0 built" in run([installed / "rattbuild", "build", "-C", project]).stdout
@@ -478,11 +482,72 @@ def test_distribution(work):
         run([installed / "rattpkg", "verify", "-C", project])
         if profile.endswith("-exe"):
             assert run([project / "build" / project.name]).stdout == "Hello from Rattpack!\n"
-    project = work / "c-exe starter"
+    project = scaffolds / "c-exe-starter"
     destination = work / "installed-plugin-export"
     run([installed / "rattbuild", "export", "-C", project, "--to=" + str(installed / "plugins/ninja.so"), "-o", destination])
     run(["ninja", "-C", destination])
     check("installed CLIs, runtime and plugin work outside checkout; all eight scaffolds build")
+
+
+def assist_stub(work, response, log):
+    """A stub OpenCode V2 CLI: rattspec uses the CLI for IPC and auth."""
+    script = work / ("fake opencode " + log.name)
+    script.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > " + str(log) + "\ncat <<'RESPONSE'\n"
+                      + response + "\nRESPONSE\n")
+    script.chmod(0o755)
+    return script
+
+
+def test_assist(work):
+    log = work / "argv.txt"
+    spec_text = json.dumps("project(name: \"assist demo\", version: \"1.0.0\", kind: \"single\")\n"
+                           "import \"target\"\n"
+                           "target.executable(name: \"demo\", language: \"c\", sources: [\"main.c\"])\n")
+    manifest_text = json.dumps("package(name: \"assist-demo\", version: \"1.0.0\")\ndeps {\n"
+                               "  dep \"fmt\" from: git(\"https://example.org/fmt.git\"), tag: \"11.0.2\"\n}\n")
+    proposal = json.dumps({"files": {"Rattspec": json.loads(spec_text), "Rattpkg": json.loads(manifest_text)},
+                           "summary": "Added a C executable and pinned fmt."})
+    response = json.dumps({"data": {"text": proposal}})
+    stub = assist_stub(work, response, log)
+
+    project = work / "assist project"
+    put(project, "main.c", "int main(void) { return 0; }\n")
+    preview = run([BUILD / "rattspec", "assist", "add fmt and an executable", "-C",
+                   project, "--opencode", stub, "--dry-run"]).stdout
+    assert '"Rattspec"' in preview and not (project / "Rattspec").exists()
+    argv = log.read_text().splitlines()
+    assert argv[0] == "api" and argv[1] == "post"
+    assert argv[2] == "/api/experimental/generate"
+    assert json.loads(argv[4])["prompt"].endswith('"add fmt and an executable"}')
+
+    run([BUILD / "rattspec", "assist", "add fmt and an executable", "-C", project, "--opencode", stub])
+    assert "Added a C executable and pinned fmt." in run(
+        [BUILD / "rattspec", "assist", "add fmt and an executable", "-C", project,
+         "--opencode", stub]).stdout
+    assert not (project / "Rattpkg.lock").exists()
+    run([BUILD / "rattbuild", "build", "--warnings-as-errors", "-C", project])
+    assert (project / "build/demo").exists()
+
+    # The model reference and explicit server reach the CLI unchanged.
+    run([BUILD / "rattspec", "assist", "again", "-C", project, "--opencode", stub,
+         "--model", "opencode-go/space-bunny-free#free", "--server", "http://127.0.0.1:4096"])
+    argv = log.read_text().splitlines()
+    assert json.loads(argv[4])["model"] == {"providerID": "opencode-go",
+                                            "id": "space-bunny-free", "variant": "free"}
+    assert argv[-2:] == ["--server", "http://127.0.0.1:4096"]
+
+    # A proposal the host cannot accept is never written.
+    broken = assist_stub(work, json.dumps({"data": {"text": json.dumps(
+        {"files": {"Rattpkg": "package(name: \"assist-demo\", version: \"1.0.0\")\ndeps {\n"
+                  "  dep \"fmt\" from: git(\"https://example.org/fmt.git\")\n}\n"},
+         "summary": "unpinned"})}}), work / "broken.txt")
+    before = (project / "Rattpkg").read_text()
+    assert "E_ASSIST" in run([BUILD / "rattspec", "assist", "x", "-C", project,
+                              "--opencode", broken], ok=False).stdout
+    assert (project / "Rattpkg").read_text() == before
+    assert "E_ASSIST" in run([BUILD / "rattspec", "assist", "x", "-C", project,
+                              "--opencode", str(work / "missing opencode")], ok=False).stdout
+    check("rattspec assist drives OpenCode IPC, publishes validated files, and fails closed")
 
 
 def test_parallel_and_hermetic(work):
@@ -579,6 +644,7 @@ def main():
         test_exporters(work)
         test_profiles_and_identity(work)
         test_distribution(work)
+        test_assist(work)
         test_parallel_and_hermetic(work)
         test_packages(work)
     print(f"{count} integration scenarios passed")

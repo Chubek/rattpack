@@ -29,6 +29,16 @@ configuration "rattpkg" {
     targetName "rattpkg"
     mainSourceFile "source/apps/rattpkg/main.d"
 }
+configuration "rattspec" {
+    targetType "executable"
+    targetName "rattspec"
+    mainSourceFile "source/apps/rattspec/main.d"
+}
+configuration "ratt-language-server" {
+    targetType "executable"
+    targetName "ratt-language-server"
+    mainSourceFile "source/apps/ratt-language-server/main.d"
+}
 configuration "bootstrap-runtime" {
     targetType "none"
 }

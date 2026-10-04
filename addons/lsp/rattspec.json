@@ -1,0 +1,7 @@
+{
+  "languageId": "rattspec",
+  "extensions": [".rattspec", ".rattspec.in"],
+  "filenames": ["Rattspec", "Rattspec.m", "Rattspec.in", "Rattspec.m.in"],
+  "command": ["ratt-language-server", "--stdio"],
+  "rootMarkers": ["Rattspec", "Rattspec.in", "Rattpkg", "Rattpkg.in", ".git"]
+}

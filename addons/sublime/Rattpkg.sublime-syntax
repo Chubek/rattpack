@@ -1,0 +1,18 @@
+%YAML 1.2
+---
+name: Rattpkg
+version: 2
+extends: Rattscript.sublime-syntax
+file_extensions:
+  - Rattpkg
+  - Rattpkg.in
+  - rattpkg
+  - rattpkg.in
+first_line_match: '^\s*package\s*\('
+scope: source.rattpkg
+
+contexts:
+  main:
+    - meta_prepend: true
+    - match: '\b(package|deps|dep|registry|git|http|ftp)\b'
+      scope: keyword.declaration.rattpkg

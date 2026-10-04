@@ -43,8 +43,10 @@ def run(argv):
 
 
 def import_flags():
+    # DUB's description metadata must stay within the writable build tree.
     description = json.loads(subprocess.check_output(
-        ["dub", "describe", "-c", "rattbuild", "--compiler=" + compiler], cwd=root, text=True))
+        ["dub", "describe", "-c", "rattbuild", "--compiler=" + compiler,
+         "--dest=" + str(root / "build")], cwd=root, text=True))
     flags = []
     for package in description["packages"]:
         for field, prefix in (("importPaths", "-I"), ("stringImportPaths", "-J")):
@@ -105,9 +107,9 @@ elif arguments[0] == "plugins":
     directory = root / "build/plugins"
     directory.mkdir(parents=True, exist_ok=True)
     extension = ".dll" if windows else ".dylib" if macos else ".so"
-    for exporter in ("cmake", "gnumake", "ninja", "meson"):
-        run([compiler, "plugins/" + exporter + "/plugin.d"] + imports
+    for plugin in ("cmake", "gnumake", "ninja", "meson", "opencode-assist"):
+        run([compiler, "plugins/" + plugin + "/plugin.d"] + imports
             + compiler_flags(shared=True, plugin=True)
-            + ["-od=" + str(directory), "-of=" + str(directory / (exporter + extension))])
+            + ["-od=" + str(directory), "-of=" + str(directory / (plugin + extension))])
 else:
     raise SystemExit("usage: dogfood.py [--compiler DC] library | app NAME | plugins")

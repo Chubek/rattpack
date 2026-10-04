@@ -1,0 +1,6 @@
+{
+  "languageId": "rattscript",
+  "extensions": [".ratt", ".ratt.in", ".rattscript", ".rattscript.in"],
+  "command": ["ratt-language-server", "--stdio"],
+  "rootMarkers": ["Rattspec", "Rattspec.in", "Rattpkg", "Rattpkg.in", ".git"]
+}

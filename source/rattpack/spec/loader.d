@@ -467,7 +467,7 @@ class SpecLoader
             string[] argv = [compiler] ~ flags ~ sources;
             if (definition.kind == "library")
                 argv ~= isShared ? ["-shared", "-fPIC"] : ["-lib"];
-            argv ~= libraries ~ ["-of=" ~ output];
+            argv ~= libraries ~ ["-od=" ~ dirName(output), "-of=" ~ output];
             action.commands ~= argv;
         }
         else if (definition.kind == "library" && !isShared)

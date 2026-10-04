@@ -1,0 +1,20 @@
+%YAML 1.2
+---
+name: Rattspec
+version: 2
+extends: Rattscript.sublime-syntax
+file_extensions:
+  - Rattspec
+  - Rattspec.m
+  - Rattspec.in
+  - Rattspec.m.in
+  - rattspec
+  - rattspec.in
+first_line_match: '^\s*(project|module)\s*\('
+scope: source.rattspec
+
+contexts:
+  main:
+    - meta_prepend: true
+    - match: '\b(project|module|target|rule|monorepo|member|vendored|ignore)\b'
+      scope: keyword.declaration.rattspec

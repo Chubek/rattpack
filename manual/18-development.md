@@ -10,9 +10,12 @@ source behavior, dependency pins, platform interfaces, or the plugin ABI.
 
 | Path | Responsibility |
 | --- | --- |
-| `source/apps/` | Thin `main` entry points for the three applications |
+| `source/apps/` | Thin `main` entry points for the applications and language server |
+| `source/rattpack/spec/assist.d` | Assisted spec/manifest editing: prompt context, proposal validation, atomic writes |
 | `source/rattpack/cli/` | Command parsing and command orchestration |
 | `source/rattpack/script/` | Lexer, parser, AST, values, environments, evaluator, lint, snapshots |
+| `source/rattpack/lsp/` | Static language services and LSP framing/session handling |
+| `addons/` | Vim, Neovim, Sublime Text runtimes and generic LSP client descriptors |
 | `source/rattpack/stdlib/` | Module registry and native math/codec/regex primitives |
 | `stdlib/` | Embedded Rattscript algorithms and public wrappers for native primitives |
 | `source/rattpack/spec/` | Identity/discovery and target lowering |
@@ -31,6 +34,7 @@ source behavior, dependency pins, platform interfaces, or the plugin ABI.
 | `tests/unit/` | D tests using unit-threaded |
 | `tests/script/` | Rattscript golden fixtures |
 | `tests/integration/` | End-to-end fixtures, compiler/export/package harness |
+| `tests/addons/` | Language-server protocol and headless editor integration tests |
 | `docs/`, `manual/` | Quick references and this manual |
 
 ## 18.2 Bootstrap and self-hosting
@@ -42,7 +46,8 @@ dub build -c rattbuild --compiler=ldc2
 ```
 
 The root `Rattspec` builds the shared runtime and then the application entry
-points. A subsequent unchanged run should skip the four declared targets.
+points, including the editor language server and `rattspec`. A subsequent
+unchanged run should skip the six declared targets.
 This checks both the host bootstrap and its own input/recipe tracking.
 
 The runtime's native pre-build command calls `tools/build-native.py`, which uses

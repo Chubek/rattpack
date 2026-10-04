@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "command": ["ratt-language-server", "--stdio"],
+  "selector": "source.rattpkg",
+  "schemes": ["file", "untitled"]
+}

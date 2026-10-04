@@ -1,0 +1,97 @@
+%YAML 1.2
+---
+name: Rattscript
+version: 2
+file_extensions:
+  - ratt
+  - ratt.in
+  - rattscript
+  - rattscript.in
+scope: source.rattscript
+
+contexts:
+  main:
+    - include: comments
+    - include: templates
+    - match: '\b(fn)\s+([A-Za-z_][A-Za-z0-9_]*)'
+      captures:
+        1: storage.type.function.rattscript
+        2: entity.name.function.rattscript
+    - match: '\b(let|var|const|fn|import|as)\b'
+      scope: storage.type.rattscript
+    - match: '\b(if|else|for|foreach|while|return|break|continue|action)\b'
+      scope: keyword.control.rattscript
+    - match: '\b(and|or|not|in)\b|&&|\|\||\.\.|->|[-+*/%=!<>]'
+      scope: keyword.operator.rattscript
+    - match: '\b(true|false|nil)\b'
+      scope: constant.language.rattscript
+    - match: '\b(any|bool|int|float|str|path|list|map|set|target|rule|pkg)\b'
+      scope: storage.type.rattscript
+    - match: '\b(print|assert|len|type|range|sorted|keys)\b'
+      scope: support.function.rattscript
+    - match: '\b[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b'
+      scope: constant.numeric.rattscript
+    - match: '\b([A-Za-z_][A-Za-z0-9_]*)(\s*:)(?!:)'
+      captures:
+        1: variable.parameter.rattscript
+        2: punctuation.separator.key-value.rattscript
+    - match: '\b[A-Za-z_][A-Za-z0-9_]*(?=\s*\()'
+      scope: variable.function.rattscript
+    - match: '"'
+      scope: punctuation.definition.string.begin.rattscript
+      push: double-string
+    - match: "'"
+      scope: punctuation.definition.string.begin.rattscript
+      push: single-string
+    - match: '[{}\[\]()]'
+      scope: punctuation.section.rattscript
+    - match: '[,;.]'
+      scope: punctuation.separator.rattscript
+
+  comments:
+    - match: '#|//'
+      scope: punctuation.definition.comment.rattscript
+      push:
+        - meta_scope: comment.line.rattscript
+        - match: '\b(TODO|FIXME|NOTE|XXX)\b'
+          scope: keyword.other.todo.rattscript
+        - match: '$'
+          pop: true
+
+  double-string:
+    - meta_scope: string.quoted.double.rattscript
+    - include: escapes
+    - include: templates
+    - match: '"'
+      scope: punctuation.definition.string.end.rattscript
+      pop: true
+
+  single-string:
+    - meta_scope: string.quoted.single.rattscript
+    - include: escapes
+    - include: templates
+    - match: "'"
+      scope: punctuation.definition.string.end.rattscript
+      pop: true
+
+  escapes:
+    - match: '\\(?:[nrtbf/\\''"]|u[0-9A-Fa-f]{4})'
+      scope: constant.character.escape.rattscript
+    - match: '\\.'
+      scope: invalid.illegal.escape.rattscript
+
+  templates:
+    - match: '@(if|else|end|foreach)\b'
+      scope: keyword.control.template.rattscript
+    - match: '@\{'
+      scope: punctuation.section.interpolation.begin.rattscript
+      push: template-expression
+
+  template-expression:
+    - meta_scope: meta.interpolation.rattscript
+    - match: '\}'
+      scope: punctuation.section.interpolation.end.rattscript
+      pop: true
+    - match: '\{'
+      push: template-expression
+    - include: main

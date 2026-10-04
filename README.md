@@ -2,7 +2,7 @@
 
 Rattpack is a portable build system and package manager implemented in D. Its
 tree-walking **Rattscript** language describes projects, build actions, and
-package dependencies. All three command-line applications share `librattpack`.
+package dependencies. All four command-line applications share `librattpack`.
 
 The [Rattpack Manual](manual/README.md) provides a complete, chapter-by-chapter
 guide to installation, the language and APIs, building, packages, exporters,
@@ -14,6 +14,10 @@ extensions, and troubleshooting.
   archives, writes deterministic TOML lockfiles, and verifies cached content.
 - **`rattsc`** runs Rattscript, checks optional annotations, runs golden tests,
   and provides a REPL.
+- **`rattspec`** creates and updates `Rattspec` and `Rattpkg` from a
+  natural-language request using the `opencode-assist` plugin.
+- **`ratt-language-server`** provides static editor diagnostics, completion,
+  hover, definitions, and document symbols over LSP.
 
 ## Build and test
 
@@ -32,7 +36,9 @@ sh tools/check.sh                       # pinned formatter, linter, unit/golden 
 ```
 
 Applications can also be bootstrapped separately with `dub build -c rattsc` or
-`dub build -c rattpkg`. Set `DC` to choose the compiler for repository helpers.
+`dub build -c rattpkg`; build editor services with
+`dub build -c ratt-language-server`. Set `DC` to choose the compiler for
+repository helpers.
 The bootstrap library links the pinned BLAKE3, libgit2, zlib, and xz sources.
 The self-hosted build uses the configured `toolchain.d`; set it to `dmd` when
 dogfooding a DMD bootstrap. Plugins must use the same compiler as their host.
@@ -185,6 +191,23 @@ Applications should commit `Rattpkg.lock`; libraries should not. `rattbuild` can
 query already-fetched dependencies through `pkg.get("name")` and never fetches
 them itself. See the [registry protocol](docs/registry.md).
 
+## Assisted specification editing
+
+`rattspec assist` writes `Rattspec` and `Rattpkg` from a natural-language request
+using OpenCode V2, through its own CLI so discovery and authentication apply:
+
+```sh
+rattspec assist 'add these libraries: fmt and zlib'
+rattspec assist 'turn this into a monorepo' --dry-run
+```
+
+The plugin sends the existing files plus a bounded source inventory to
+`POST /api/experimental/generate`. Proposals are parsed, linted, and checked
+against the real manifest reader before anything is written, and files edited
+during generation are never overwritten. Model output is not executed. Use
+`--model provider/model#variant`, `--server URL`, and `--timeout` to control the
+request. See [command-line reference](manual/04-command-line.md).
+
 ## Rattscript
 
 ```sh
@@ -209,3 +232,19 @@ Standard modules: `fs`, `path`, `proc`, `str`, `toolchain`, `target`, `pkg`, `en
 are embedded in the runtime. See the [language reference](docs/rattscript.md),
 [standard-library manual](manual/06-standard-library.md), and
 [diagnostics](docs/diagnostics.md).
+
+## Editor integration
+
+[`addons/`](addons/README.md) contains Vim, Neovim, and Sublime Text packages for
+Rattscript, `Rattspec`/`Rattspec.m`, `Rattpkg`, and their templates. Neovim 0.8+
+starts the bundled server through its native LSP client. Vim supports saved-file
+linting and external LSP clients; Sublime Text integrates with the LSP package.
+
+```sh
+dub build -c ratt-language-server
+python3 tests/addons/run.py
+```
+
+The installer includes the server and places editor packages under
+`share/rattpack/addons/`. See the [add-on guide](addons/README.md) for setup and
+configuration.

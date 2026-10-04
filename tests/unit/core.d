@@ -18,12 +18,13 @@ import rattpack.plugin.abi;
 import rattpack.plugin.loader;
 import rattpack.diagnostic;
 import rattpack.rt.sys;
+import rattpack.serialization : jsonObject;
 import std.file;
 import std.path;
 import std.random : uniform;
 import std.conv : to;
 import std.json;
-import std.string : replace;
+import std.string : replace, startsWith;
 
 private class Fixture
 {
@@ -500,6 +501,74 @@ unittest
     scheduler.build.skipped.shouldEqual(1);
     fixture.put("input", "changed");
     expectCode("E_HERMETIC", { scheduler.build; });
+}
+
+@("assist proposals are decoded, validated, and applied atomically")
+unittest
+{
+    import rattpack.spec.assist;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    // An existing spec is input only; the proposal below creates just the manifest.
+    fixture.put("Rattspec",
+            "project(name: \"app\", version: \"1.0.0\", kind: \"single\")\n"
+            ~ "rule(name: \"r\", output: \"build/r\")\n");
+    auto project = readAssistProject(fixture.root);
+    project.files["Rattspec"].present.shouldBeTrue;
+    // Build the response with the JSON writer; a Rattscript file contains real
+    // newlines that cannot be embedded in a hand-written JSON string literal.
+    string proposal(string name, string contents)
+    {
+        auto files = jsonObject();
+        files[name] = JSONValue(contents);
+        auto response = jsonObject();
+        response["files"] = files;
+        response["summary"] = JSONValue("done");
+        return response.toString;
+    }
+
+    auto manifest = "package(name: \"app\", version: \"1.0.0\")\ndeps {\n"
+        ~ "  dep \"fmt\" from: git(\"https://example.org/fmt.git\"), tag: \"11.0.2\"\n}\n";
+    // Unpinned Git dependencies are rejected by the real manifest reader.
+    expectCode("E_ASSIST", delegate{
+        decodeAssistProposal(proposal("Rattpkg", "package(name: \"app\", version: \"1.0.0\")\n"
+            ~ "deps { dep \"fmt\" from: git(\"https://example.org/fmt.git\") }\n"), project);
+    });
+    expectCode("E_ASSIST", delegate{
+        decodeAssistProposal(proposal("README.md", "text"), project);
+    });
+    expectCode("E_ASSIST", delegate{
+        decodeAssistProposal(proposal("Rattpkg", "package(name: \"app\", version: 1)\n"), project);
+    });
+    expectCode("E_IDENTITY_MISMATCH", delegate{
+        decodeAssistProposal(proposal("Rattspec",
+            "module(name: \"sub\")\n" ~ "rule(name: \"r\", output: \"build/r\")\n"), project);
+    });
+    // A Rattspec without a target, or with two identities, is not a usable spec.
+    expectCode("E_ASSIST", delegate{
+        decodeAssistProposal(proposal("Rattspec",
+            "project(name: \"app\", version: \"1.0.0\", kind: \"single\")\n"), project);
+    });
+    expectCode("E_ASSIST", delegate{
+        decodeAssistProposal(proposal("Rattpkg",
+            "package(name: \"app\", version: \"1.0.0\")\npackage(name: \"app\", version: \"1.0.0\")\n"),
+            project);
+    });
+    // Fenced JSON from a chatty model is accepted.
+    auto accepted = decodeAssistProposal("```json\n" ~ proposal("Rattpkg",
+            manifest) ~ "\n```", project);
+    accepted.files["Rattpkg"].shouldEqual(manifest);
+    applyAssistProposal(project, accepted);
+    readText(buildPath(fixture.root, "Rattpkg")).shouldEqual(manifest);
+    // The untouched spec keeps its original content.
+    readText(buildPath(fixture.root, "Rattspec")).startsWith("project(name: \"app\"").shouldBeTrue;
+    // A concurrent edit during generation aborts without touching either file.
+    fixture.put("Rattpkg", "package(name: \"other\", version: \"2\")\n");
+    expectCode("E_ASSIST", delegate{ applyAssistProposal(project, accepted); });
+    readText(buildPath(fixture.root, "Rattpkg")).shouldEqual(
+            "package(name: \"other\", version: \"2\")\n");
 }
 
 @("action environment is explicit, frozen, hashed and round trips")

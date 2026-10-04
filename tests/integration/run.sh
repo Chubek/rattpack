@@ -5,5 +5,7 @@ cd "$root"
 dub build -c rattbuild --compiler="${DC:-ldc2}"
 dub build -c rattpkg --compiler="${DC:-ldc2}"
 dub build -c rattsc --compiler="${DC:-ldc2}"
+dub build -c rattspec --compiler="${DC:-ldc2}"
+dub build -c ratt-language-server --compiler="${DC:-ldc2}"
 sh tools/build-plugins.sh
 python3 tests/integration/run.py
