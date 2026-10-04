@@ -1,0 +1,17 @@
+# phase: construction
+import "math"
+print(math.abs(-5), math.abs(-1.5), math.sign(-2), math.sign(0), math.sign(3))
+print(math.min(10, 2), math.max(10, 2), math.clamp(12, 0, 10))
+print(math.pow(2, 10), math.pow(2, -4), math.pow(2, -1), math.pow(0, 0))
+print(math.gcd(-54, 24), math.lcm(-6, 8), math.gcd(0, 0), math.lcm(0, 9))
+print(math.sqrt(9), math.floor(-1.2), math.ceil(-1.2), math.round(-1.5))
+print(math.log(1), math.exp(0), math.sin(0), math.cos(0), math.tan(0))
+assert(math.abs(math.sin(math.pi / 2) - 1) < 0.000000000001)
+assert(math.abs(math.log(math.e) - 1) < 0.000000000001)
+assert(math.pow(1, -9223372036854775808) == 1)
+assert(math.pow(-1, -9223372036854775808) == 1)
+assert(math.pow(2, -64) > 0)
+assert(math.gcd(-9223372036854775808, 2) == 2)
+assert(math.gcd(-9223372036854775808, -1) == 1)
+assert(type(math.pow(2, 10)) == "int")
+print(math.is_finite(1), math.is_finite(float("nan")), math.is_finite(float("inf")))

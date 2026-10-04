@@ -1,0 +1,14 @@
+# phase: construction
+import "functional" as functions
+let twice = fn(value) { return value * 2 }
+let increment = fn(value) { return value + 1 }
+print(functions.identity(42), functions.constant("fixed")(nil))
+print(functions.compose(twice, increment)(3), functions.pipe([twice, increment])(3))
+print(functions.negate(fn(value) { return value > 0 })(-1))
+print(functions.bind_first(fn(a, b) { return a - b }, 10)(3))
+print(functions.repeat(twice, 4)(1), functions.repeat(twice, 0)(5))
+assert(functions.pipe([])(42) == 42)
+let transforms = [twice]
+let pipeline = functions.pipe(transforms)
+transforms.append(increment)
+assert(pipeline(3) == 6)

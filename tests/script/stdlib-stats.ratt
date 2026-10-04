@@ -1,0 +1,11 @@
+# phase: construction
+import "stats"
+let values = [10, 2, 4, 8]
+print(stats.sum(values), stats.mean(values), stats.median(values))
+print(stats.quantile(values, 0), stats.quantile(values, 0.25), stats.quantile(values, 1))
+print(stats.variance([1, 2, 3]), stats.variance([1, 2, 3], sample: true))
+print(stats.stdev([1, 1, 1]), stats.sum([]), stats.median([5]))
+assert(stats.median([10, 2, 3]) == 3)
+assert(stats.variance([42]) == 0)
+assert(stats.variance([1000000000001.0, 1000000000002.0, 1000000000003.0], sample: true) == 1)
+assert(values == [10, 2, 4, 8])

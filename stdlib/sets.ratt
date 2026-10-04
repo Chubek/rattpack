@@ -1,0 +1,39 @@
+# Accept lists or sets. Set construction uses Rattscript structural equality.
+fn union(left, right) -> set {
+    let result = []
+    for value in set(left) { result.append(value) }
+    for value in set(right) { result.append(value) }
+    return set(result)
+}
+
+fn intersection(left, right) -> set {
+    let result = []
+    let other = set(right)
+    for value in set(left) { if value in other { result.append(value) } }
+    return set(result)
+}
+
+fn difference(left, right) -> set {
+    let result = []
+    let other = set(right)
+    for value in set(left) { if not (value in other) { result.append(value) } }
+    return set(result)
+}
+
+fn symmetric_difference(left, right) -> set {
+    return union(difference(left, right), difference(right, left))
+}
+
+fn is_subset(left, right) -> bool {
+    let other = set(right)
+    for value in set(left) { if not (value in other) { return false } }
+    return true
+}
+
+fn is_superset(left, right) -> bool { return is_subset(right, left) }
+
+fn is_disjoint(left, right) -> bool {
+    let other = set(right)
+    for value in set(left) { if value in other { return false } }
+    return true
+}

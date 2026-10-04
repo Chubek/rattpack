@@ -1,0 +1,52 @@
+# Descriptive statistics over numeric lists.
+import "math"
+import "list" as sequence
+
+fn sum(values: list) {
+    let result: float = 0
+    for value in values { let number: float = value; result += number }
+    return result
+}
+
+fn mean(values: list) -> float {
+    assert(len(values) > 0, "stats.mean needs at least one value")
+    return float(sum(values)) / len(values)
+}
+
+fn quantile(values: list, q: float) -> float {
+    assert(len(values) > 0, "stats.quantile needs at least one value")
+    assert(q >= 0 and q <= 1, "stats.quantile q must be between zero and one")
+    for value in values { let number: float = value }
+    let ordered = sequence.sort(values)
+    let position = (len(ordered) - 1) * float(q)
+    let lower = int(math.floor(position))
+    let upper = int(math.ceil(position))
+    let fraction = position - lower
+    return float(ordered[lower]) * (1.0 - fraction) + float(ordered[upper]) * fraction
+}
+
+fn median(values: list) -> float { return quantile(values, 0.5) }
+
+# Welford's recurrence avoids subtracting two large, nearly equal sums.
+fn variance(values: list, sample: bool = false) -> float {
+    let minimum = 1
+    if sample { minimum = 2 }
+    assert(len(values) >= minimum, "stats.variance has too few values")
+    let count = 0
+    let average = 0.0
+    let squared = 0.0
+    for value in values {
+        let number: float = value
+        count += 1
+        let delta = number - average
+        average += delta / count
+        squared += delta * (number - average)
+    }
+    let divisor = count
+    if sample { divisor -= 1 }
+    return squared / divisor
+}
+
+fn stdev(values: list, sample: bool = false) -> float {
+    return math.sqrt(variance(values, sample))
+}

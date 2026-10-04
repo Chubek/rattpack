@@ -1,0 +1,15 @@
+# phase: construction
+import "dict"
+let original = {z: 3, a: 1, absent: nil}
+assert(dict.get(original, "absent", 99) == nil)
+assert(dict.get(original, "missing", 99) == 99)
+assert(dict.values({}) == [] and dict.items({}) == [])
+assert(dict.from_items([]) == {})
+print(dict.values(original), dict.items(original))
+let merged = dict.merge(original, {a: 2, b: 4})
+merged.z = 100
+assert(original.z == 3 and original.a == 1)
+print(dict.pick(merged, ["b", "a", "missing"]))
+print(dict.omit(original, ["absent", "z"]))
+print(dict.from_items([["x", 1], ["x", 2], ["y", 3]]))
+print(dict.map_values({b: 2, a: 1}, fn(value) { return value * 10 }))

@@ -13,8 +13,8 @@ source behavior, dependency pins, platform interfaces, or the plugin ABI.
 | `source/apps/` | Thin `main` entry points for the three applications |
 | `source/rattpack/cli/` | Command parsing and command orchestration |
 | `source/rattpack/script/` | Lexer, parser, AST, values, environments, evaluator, lint, snapshots |
-| `source/rattpack/stdlib/` | Native Rattscript module installation |
-| `stdlib/` | Embedded pure Rattscript extensions |
+| `source/rattpack/stdlib/` | Module registry and native math/codec/regex primitives |
+| `stdlib/` | Embedded Rattscript algorithms and public wrappers for native primitives |
 | `source/rattpack/spec/` | Identity/discovery and target lowering |
 | `source/rattpack/graph/` | Artifact/action model, hashes, scheduling, cache |
 | `source/rattpack/config/` | TOML/YAML settings, profiles, template rendering |
@@ -87,6 +87,10 @@ configuration/templates, graph identities, scheduling/tamper checks,
 monorepo identity, lockfile round-tripping, and ABI validation. Test fixtures
 use isolated directories and remove them after execution.
 
+`tests/unit/stdlib.d` additionally covers embedded-module loading and isolation,
+annotation linting, malformed inputs, numeric domains, JSON nesting boundaries,
+SemVer precedence, and deterministic action restoration with native helpers.
+
 Use `--compiler=dmd` for compatibility checks. Test the affected subsystem and
 the required suite after source changes. Meaningful tests should verify a
 behavioral boundary rather than merely repeat the implementation's operations.
@@ -125,6 +129,10 @@ golden `# lint` fixture path directly checks its parsed AST.
 
 Every new coded diagnostic needs documentation and a golden case according to
 the repository contract.
+
+The `stdlib-*.ratt` fixtures exercise the expanded modules in construction mode,
+along with codec/domain failures and callback phase enforcement. See
+[chapter 24](24-writing-rattscript-libraries.md) for a small complete golden suite.
 
 ## 18.6 Integration tests
 
@@ -205,10 +213,12 @@ graphs. It records shared object identity so repeated references to the same
 collection or closure remain shared after thawing. Native bindings are restored
 by registered names; bound list methods preserve their receivers.
 
-The scheduler installs shipped native modules in a fresh execution evaluator,
-restores captured settings, thaws the action, and executes its body in a child
-environment. Custom embedding hosts must arrange compatible registration for
-their own captured native bindings.
+The scheduler restores captured settings and sets up a fresh execution evaluator
+with declared file scopes and the captured process environment. `installStdlib`
+eagerly registers the embedded libraries' native primitives; the scheduler also
+loads the core native modules before thawing the action and executing its body
+in a child environment. Custom embedding hosts must arrange compatible
+registration for their own captured native bindings.
 
 ## 18.11 Graph and package internals
 
@@ -218,8 +228,9 @@ are assembled in deterministic name/path order. DOT carries that JSON as its
 round-trip payload.
 
 The scheduler uses MessagePack cache entries keyed by action name, with recipe/
-input keys and output hashes. Ready actions run in bounded batches; logs are
-collected per action before being emitted.
+input keys and output hashes. Ready actions run on a bounded system-thread pool;
+completion releases dependent work without a batch barrier. The coordinator
+collects each action's logs and records successful output hashes.
 
 Package resolution uses deterministic name ordering and descending semantic
 versions with backtracking. Acquired candidates are memoized within a manager
@@ -242,3 +253,31 @@ Commit summaries use `component: imperative summary`, for example
 `graph: hash toolchain fingerprint into node id`. If implementation and the
 repository contract disagree, record a `spec-drift:` issue with the discrepancy
 rather than silently redefining the contract.
+
+## 18.13 Embedded standard-library implementation
+
+The current library has two cooperating layers:
+
+- [`source/rattpack/stdlib/modules.d`](../source/rattpack/stdlib/modules.d)
+  selects built-in names, preprocesses template sources, and evaluates embedded
+  `.ratt` modules in their own scopes.
+- [`source/rattpack/stdlib/primitives.d`](../source/rattpack/stdlib/primitives.d)
+  registers portable native math, JSON, regex, and Base64 primitives. Stable
+  names such as `json.stringify` allow snapshot restoration.
+
+`runtime/dub.sdl` exposes `stdlib/` as a string-import directory. The module
+registry embeds each registered source with D's `import("name.ratt")`; the root
+dogfood spec tracks `stdlib/*.ratt` as runtime inputs. Adding a source file also
+requires registering its import name and rebuilding the shared runtime.
+
+Embedded modules export their own top-level bindings. For modules using native
+support, an extra parent scope supplies `_native` without exporting it in the
+module map. Each evaluator caches the resulting module, keeping initialization
+and mutable module state isolated from other evaluators.
+
+Pure collection algorithms belong in Rattscript. Native support handles library
+operations such as strict JSON parsing or floating-point functions, with the
+usual typed-value conversion and phase checks. Registration happens before
+thawing so execution does not depend on a fresh source import occurring first.
+[Chapter 24](24-writing-rattscript-libraries.md) turns this architecture into a
+contribution workflow.

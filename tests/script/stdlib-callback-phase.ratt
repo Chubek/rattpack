@@ -1,0 +1,6 @@
+# phase: construction
+import "functional"
+import "iter"
+import "proc"
+let callback = functional.compose(fn(value) { return value }, proc.env)
+iter.any(["HOME"], callback)

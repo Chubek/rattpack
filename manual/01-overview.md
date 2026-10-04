@@ -151,5 +151,23 @@ Build specifications can also use the template forms `Rattspec.in` and
 - **Package tree hash:** the SHA-256 identity of extracted or checked-out package
   paths, contents, and relevant entry metadata.
 
+## 1.8 The expanded scripting toolbox
+
+The runtime embeds reusable libraries alongside filesystem, process, path,
+configuration, target, and package operations:
+
+| Task | Modules | Walkthrough |
+| --- | --- | --- |
+| Shape lists/maps and combine callbacks | `collections`, `list`, `dict`, `sets`, `iter`, `functional` | [Chapter 20](20-collection-pipelines.md) |
+| Read structured records and transform text | `json`, `regex`, `base64`, `str` | [Chapter 21](21-structured-data-and-text.md) |
+| Compute numeric summaries | `math`, `stats` | [Chapter 22](22-numeric-analysis.md) |
+| Validate and order release versions | `semver` | [Chapter 23](23-versioned-release-workflows.md) |
+
+Import these modules by name. Their source files are compiled into the shared
+runtime, so a deployed interpreter does not need a separate `stdlib/` directory.
+Pure helpers work during construction and execution, and their callbacks retain
+the calling phase's restrictions. Imported helpers can be captured in frozen
+actions, including helpers that use the shipped native codec/math primitives.
+
 Proceed to [installation](02-installation.md), or use the
 [first-project tutorial](03-first-project.md) if the applications are available.

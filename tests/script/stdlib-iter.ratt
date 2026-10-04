@@ -1,0 +1,19 @@
+# phase: construction
+import "iter"
+let values = [1, 2, 3, 4]
+let small = fn(value) { return value < 3 }
+print(iter.take(values, 2), iter.drop(values, 2))
+print(iter.take_while(values, small), iter.drop_while(values, small))
+print(iter.enumerate(["a", "b"], start: 5), iter.zip([1, 2, 3], ["a", "b"]))
+print(iter.product([1, 2], ["x", "y"]))
+print(iter.scan(values, 0, fn(a, b) { return a + b }))
+print(iter.all(values, small), iter.any(values, small), iter.find(values, fn(n) { return n > 2 }))
+print(iter.count(values, small), iter.find([], small, default: "missing"))
+assert(iter.all([], small) and not iter.any([], small))
+assert(iter.take(values, 99) == values and iter.drop(values, 99) == [])
+assert(iter.take(values, 0) == [] and iter.drop(values, 0) == values)
+assert(iter.take_while([], small) == [] and iter.drop_while([], small) == [])
+assert(iter.scan([], 42, fn(a, b) { return a + b }) == [42])
+let calls = []
+assert(iter.any(values, fn(n) { calls.append(n); return n == 2 }))
+assert(calls == [1, 2])

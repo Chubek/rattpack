@@ -1,0 +1,2 @@
+import "stats"
+stats.variance([1], sample: true)

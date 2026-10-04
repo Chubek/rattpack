@@ -1,0 +1,11 @@
+{"a":"λ/雪","z":[true,false,null,1.25]}
+{"empty":[],"object":{},"path":"src/main.c"}
+{
+  "a": {
+    "b": true
+  },
+  "z": [
+    1,
+    2
+  ]
+}

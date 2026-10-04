@@ -64,11 +64,19 @@ Use named fields for declarations, especially custom rules.
 | `shared` | Bool | `false`; library declarations normally produce static libraries |
 | `command` | List of strings/paths | Explicit argv command, overriding automatic compilation |
 | `toolchain` | String | Additional explicit toolchain identity for custom work |
+| `tools` | List of strings/paths | Additional programs resolved and content-hashed during construction, including tools called by deferred `proc.run` |
+| `env` | Map of string/path values | Process-environment overrides captured into the action recipe |
 | `sandbox` | Bool | `true`; action write scope and available subprocess restrictions |
 
 The fields `inputs` and `headers` have the same tracking role; their separate
 names help communicate intent. `include_dirs` specifies search locations but
 does not register the contents of those directories as inputs.
+
+`env:` extends the backend's deterministic default process environment. Its
+values contribute to action identity and are supplied to sandboxed execution.
+Recorded command executables and automatic compiler tools are tracked by the
+loader; list additional action-body programs in `tools:`. Strict tool and file
+access is demonstrated in [chapter 25](25-hermetic-builds.md).
 
 Only one `output` is exposed by the Rattscript declaration interface. An action
 can create ancillary files under its writable directories, but they are not

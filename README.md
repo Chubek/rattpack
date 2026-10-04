@@ -204,5 +204,8 @@ linter and when values cross annotated runtime bindings/parameters.
 without running their top-level statements.
 
 Standard modules: `fs`, `path`, `proc`, `str`, `toolchain`, `target`, `pkg`, `env`,
-`log`, and the embedded pure-Rattscript `collections` extension. See
-[language reference](docs/rattscript.md) and [diagnostics](docs/diagnostics.md).
+`log`, `collections`, `list`, `dict`, `sets`, `iter`, `functional`, `math`,
+`stats`, `json`, `regex`, `base64`, and `semver`. The Rattscript library sources
+are embedded in the runtime. See the [language reference](docs/rattscript.md),
+[standard-library manual](manual/06-standard-library.md), and
+[diagnostics](docs/diagnostics.md).

@@ -1,0 +1,8 @@
+# RFC 4648 padded Base64; url_safe selects the '-'/'_' alphabet.
+fn encode(value: str, url_safe: bool = false) -> str {
+    return _native.encode(value, url_safe)
+}
+
+fn decode(value: str, url_safe: bool = false) -> str {
+    return _native.decode(value, url_safe)
+}

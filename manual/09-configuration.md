@@ -183,8 +183,10 @@ Consequences:
   re-exported.
 - Configuration is part of action recipes; changing settings can invalidate
   actions even when their source files are unchanged.
-- Ambient process environment, read with `proc.env` in an action, is different
-  from captured configuration and is not automatically frozen or tracked.
+- Process environment is separate from configuration. Normal sandboxed actions
+  use captured backend defaults plus the target's `env:` map; `proc.env` reads
+  that map during execution. Standalone and `sandbox: false` execution instead
+  read ambient values. See [chapter 25](25-hermetic-builds.md).
 
 The graph-wide cache location used by native commands is chosen from the
 configuration at invocation. Frozen action settings still govern its execution

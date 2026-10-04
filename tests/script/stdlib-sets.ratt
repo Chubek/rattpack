@@ -1,0 +1,11 @@
+# phase: construction
+import "sets"
+let a = [3, 1, 1, 2]
+let b = set([2, 4])
+print(sets.union(a, b), sets.intersection(a, b))
+print(sets.difference(a, b), sets.symmetric_difference(a, b))
+print(sets.is_subset([1, 1], a), sets.is_superset(a, [1, 2]), sets.is_disjoint(a, [5]))
+assert(sets.is_subset([], a) and sets.is_disjoint([], a))
+assert(not sets.is_subset([5], a) and not sets.is_disjoint(a, [2]))
+assert(sets.union([[1], [1]], [[2]]) == set([[1], [2]]))
+assert(a == [3, 1, 1, 2] and b == set([2, 4]))

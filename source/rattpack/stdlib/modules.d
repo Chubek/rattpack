@@ -2,6 +2,7 @@ module rattpack.stdlib.modules;
 
 import rattpack.script.evaluator;
 import rattpack.script.value;
+import rattpack.stdlib.primitives : installPrimitives;
 import rattpack.config.environment;
 import rattpack.config.templating;
 import rattpack.content.hash;
@@ -17,6 +18,7 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
 {
     if (config is null)
         config = new Configuration;
+    auto primitives = installPrimitives(evaluator);
     evaluator.sourceTransform = (source, file) => preprocess(source, config,
             [
                 "cwd": Value.path(evaluator.cwd),
@@ -250,15 +252,36 @@ void installStdlib(Evaluator evaluator, Configuration config = null)
         case "pkg":
             fail("E_IMPORT", name ~ " is available in a project context", loc);
             break;
-        case "collections":
-            auto scope_ = new Environment(evaluator.globals);
-            evaluator.run(import("collections.ratt"), "<stdlib:collections>", scope_);
-            return Value(scope_.values);
         default:
-            fail("E_IMPORT", "unknown standard module '" ~ name ~ "'", loc);
+            auto source = embeddedSource(name);
+            if (source is null)
+                fail("E_IMPORT", "unknown standard module '" ~ name ~ "'", loc);
+            auto parent = new Environment(evaluator.globals);
+            if (auto methods = name in primitives)
+                parent.define("_native", Value(*methods));
+            auto scope_ = new Environment(parent);
+            evaluator.run(source, "<stdlib:" ~ name ~ ">", scope_);
+            return Value(scope_.values);
         }
         return Value(functions);
     };
+}
+
+private string embeddedSource(string name) @safe
+{
+    switch (name)
+    {
+        static foreach (module_; [
+            "collections", "list", "dict", "sets", "iter", "functional",
+            "math", "stats", "json", "regex", "base64", "semver"
+        ])
+        {
+    case module_:
+            return import(module_ ~ ".ratt");
+        }
+    default:
+        return null;
+    }
 }
 
 bool matchGlob(string path, string pattern) @safe

@@ -1,0 +1,79 @@
+# Strict SemVer 2.0 versions with signed 64-bit major/minor/patch components.
+import "regex" as re
+import "str" as text
+import "list" as sequence
+
+let _pattern = "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+
+fn valid(value: str) -> bool {
+    let match = re.find(value, _pattern)
+    if match == nil or match[0] != value { return false }
+    for component in sequence.slice(match, 1, 4) {
+        if len(component) > 19 { return false }
+        if len(component) == 19 and component > "9223372036854775807" { return false }
+    }
+    if match[4] != "" {
+        for identifier in text.split(match[4], ".") {
+            if re.test(identifier, "^[0-9]+$") and len(identifier) > 1 and identifier[0] == "0" {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+fn parse(value: str) -> map {
+    assert(valid(value), "invalid semantic version: " + value)
+    let match = re.find(value, _pattern)
+    return {major: int(match[1]), minor: int(match[2]), patch: int(match[3]),
+        prerelease: match[4], build: match[5]}
+}
+
+fn compare(left: str, right: str) -> int {
+    let a = parse(left)
+    let b = parse(right)
+    for part in ["major", "minor", "patch"] {
+        if a[part] < b[part] { return -1 }
+        if a[part] > b[part] { return 1 }
+    }
+    if a.prerelease == b.prerelease { return 0 }
+    if a.prerelease == "" { return 1 }
+    if b.prerelease == "" { return -1 }
+    let first = text.split(a.prerelease, ".")
+    let second = text.split(b.prerelease, ".")
+    let i = 0
+    while i < len(first) and i < len(second) {
+        let x = first[i]
+        let y = second[i]
+        if x != y {
+            let xn = re.test(x, "^[0-9]+$")
+            let yn = re.test(y, "^[0-9]+$")
+            if xn and not yn { return -1 }
+            if yn and not xn { return 1 }
+            if xn and yn {
+                if len(x) < len(y) { return -1 }
+                if len(x) > len(y) { return 1 }
+            }
+            if x < y { return -1 }
+            return 1
+        }
+        i += 1
+    }
+    if len(first) < len(second) { return -1 }
+    return 1
+}
+
+fn sort(versions: list) -> list {
+    # Validate singletons too, before the comparator is needed.
+    for version in versions { parse(version) }
+    return sequence.sort(versions, fn(a, b) { return compare(a, b) < 0 })
+}
+
+fn bump(value: str, part: str = "patch") -> str {
+    let version = parse(value)
+    assert(part in ["major", "minor", "patch"], "semver.bump part must be major, minor, or patch")
+    version[part] += 1
+    if part == "major" { version.minor = 0 }
+    if part != "patch" { version.patch = 0 }
+    return str(version.major) + "." + str(version.minor) + "." + str(version.patch)
+}

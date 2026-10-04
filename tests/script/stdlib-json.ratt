@@ -1,0 +1,21 @@
+# phase: construction
+import "json"
+import "path"
+let value = json.parse('{"z": [true, false, null, 1.25], "a": "\u03bb/雪"}')
+print(json.stringify(value))
+assert(json.parse(json.stringify(value)) == value)
+assert(json.parse('"\\uD83D\\uDE80"') == "🚀")
+assert(json.parse("9223372036854775807") == 9223372036854775807)
+assert(json.parse("-9223372036854775808") == -9223372036854775808)
+assert(type(json.parse("1.0")) == "float")
+assert(json.parse("[]") == [] and json.parse("{}") == {})
+assert(json.get(value, ["z", 2], 99) == nil)
+assert(json.get(value, ["z", -1], 99) == 99)
+assert(json.get(value, ["missing"], 99) == 99)
+assert(json.get(value, ["z", 99], 99) == 99)
+assert(json.get(value, ["a", 0], 99) == 99)
+assert(json.get(value, []) == value)
+print(json.stringify({path: path.value("src/main.c"), empty: [], object: {}}))
+print(json.stringify({z: [1, 2], a: {b: true}}, pretty: true))
+let shared = [1]
+assert(json.stringify([shared, shared]) == "[[1],[1]]")

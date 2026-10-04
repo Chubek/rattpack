@@ -163,10 +163,11 @@ or change tracked recipe/input state to request rebuilding. Package caches are
 outside this graph cache and are not cleared by `rattbuild clean`.
 
 The cache does not automatically track ambient environment, undeclared reads,
-or every tool called from an action. Automatic compiler actions fingerprint
-their selected tools. Deferred actions additionally capture configured C/C++/D
-tool fingerprints when available, but a custom generator may need its own
-explicit fingerprint or tracked script input.
+or every tool called from an action. Sandboxed actions use a captured default
+environment plus explicit `env:` overrides; that map is part of the recipe.
+Automatic compiler actions fingerprint their selected tools. Deferred actions
+additionally capture configured C/C++/D tool fingerprints when available;
+declare other programs in `tools:` and generator scripts in tracked inputs.
 
 ## 8.7 Ordering and parallelism
 
@@ -174,10 +175,12 @@ The graph must be acyclic. Unknown prerequisites raise `E_TARGET`; cycles raise
 `E_CYCLE`. With selected target names, only those actions and their prerequisite
 closure are scheduled after whole-project graph construction succeeds.
 
-The scheduler chooses ready actions in deterministic graph order, executes up
-to the requested job count as a batch, and collects logs per action. Commands
-inside one action execute sequentially. Larger job counts increase action-level
-concurrency, not concurrency inside an individual compiler declaration.
+The scheduler chooses ready actions in deterministic graph order and executes
+them on a bounded pool of system threads. As an action completes, its dependents
+can become runnable without waiting for unrelated work to finish a batch.
+The coordinator collects logs per action. Commands inside one action execute
+sequentially. Larger job counts increase action-level concurrency, not
+concurrency inside an individual compiler declaration.
 
 Undeclared nested projects can mark affected work serial because identities and
 resource scopes were not established independently. Correct monorepo
@@ -204,12 +207,14 @@ rattbuild graph --import graph.dot --json -o restored.json
 rattbuild build --import graph.json
 ```
 
-JSON uses graph format version 1 and stores root, project name, actions, and
-artifacts. Import validates producer relationships and recomputed identities.
+JSON uses graph format version 2 and stores root, project name, actions, and
+artifacts. Action records include captured environments, tool hashes, and
+strict-execution flags. Import validates producer relationships and recomputed
+identities.
 It initially uses saved source hashes for validating the serialization; native
 `build --import` then refreshes input content before scheduling.
 
-DOT includes a `// rattpack-v1:` line carrying Base64-encoded canonical JSON.
+DOT includes a `// rattpack-v2:` line carrying Base64-encoded canonical JSON.
 The visible edges are a visualization; the payload is the reimportable graph.
 Editing only visible labels/edges does not edit that payload. Removing the
 payload makes the file unsuitable for Rattpack import.
@@ -222,3 +227,15 @@ is not an automatic relocation operation.
 Exporter-specific freshness behavior differs from the native scheduler. See
 [chapter 14](14-exporters.md) before assuming another build system performs
 Rattpack's output-content checks on every build.
+
+## 8.10 Strict graph execution
+
+`rattbuild build --hermetic` additionally checks declared Rattscript reads and
+writes, frozen source/tool bytes, and subprocess tool declarations. A graph
+captured with `rattbuild graph --hermetic` retains those action flags when
+imported or exported. Strict execution rejects `sandbox: false` and reports
+contract failures as `E_HERMETIC`.
+
+Pure Rattscript actions using the embedded libraries can run strictly without
+an external process sandbox. Subprocess support depends on the backend.
+[Chapter 25](25-hermetic-builds.md) covers both paths and input-change handling.

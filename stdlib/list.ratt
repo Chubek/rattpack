@@ -1,0 +1,68 @@
+# Non-mutating sequence operations. Copies are shallow; element identities survive.
+fn copy(values: list) -> list { return values + [] }
+
+fn slice(values: list, start: int = 0, stop = nil) -> list {
+    let size = len(values)
+    let end: int = size
+    if stop != nil { end = stop }
+    if start < 0 { start += size }
+    if end < 0 { end += size }
+    if start < 0 { start = 0 }
+    if end > size { end = size }
+    let result = []
+    let i = start
+    while i < end { result.append(values[i]); i += 1 }
+    return result
+}
+
+fn reverse(values: list) -> list {
+    let result = []
+    let i = len(values)
+    while i > 0 { i -= 1; result.append(values[i]) }
+    return result
+}
+
+fn unique(values: list) -> list {
+    let result = []
+    for value in values { if not (value in result) { result.append(value) } }
+    return result
+}
+
+fn flatten(values: list) -> list {
+    let result = []
+    for entry in values {
+        let nested: list = entry
+        for value in nested { result.append(value) }
+    }
+    return result
+}
+
+fn chunks(values: list, size: int) -> list {
+    assert(size > 0, "list.chunks size must be positive")
+    let result = []
+    let i = 0
+    while i < len(values) {
+        let remaining = len(values) - i
+        let count = size
+        if count > remaining { count = remaining }
+        result.append(slice(values, i, i + count))
+        i += count
+    }
+    return result
+}
+
+# Stable merge sort, with a strict less-than predicate rather than display order.
+fn sort(values: list, less: fn = fn(a, b) { return a < b }) -> list {
+    if len(values) < 2 { return copy(values) }
+    let middle = len(values) / 2
+    let left = sort(slice(values, 0, middle), less)
+    let right = sort(slice(values, middle), less)
+    let result = []
+    let i = 0
+    let j = 0
+    while i < len(left) and j < len(right) {
+        if less(right[j], left[i]) { result.append(right[j]); j += 1 }
+        else { result.append(left[i]); i += 1 }
+    }
+    return result + slice(left, i) + slice(right, j)
+}

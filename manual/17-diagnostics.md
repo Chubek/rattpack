@@ -60,6 +60,7 @@ described in [chapter 5](05-rattscript.md). The same statements work in `while`.
 | `E_TARGET` | Empty/duplicate target name, conflicting output, unknown dependency, missing input/compiler, empty compiled source list, or target without work | Inspect target fields, qualified names, glob results, and toolchain paths |
 | `E_CYCLE` | Dependency cycle or no schedulable ready action | Remove the cyclic prerequisite relationship |
 | `E_ACTION` | Failed command, absent declared output, write outside allowed directories, or checked process failure | Examine the tool output, output spelling, working directory, and action write scope |
+| `E_HERMETIC` | Strict execution found undeclared access/tools, changed frozen content, an unsandboxed action, or unavailable isolation | Correct declarations or recapture intentionally changed inputs; see chapter 25 |
 | `E_GRAPH` | Invalid graph/version/payload, inconsistent identities, or exporter callback failure | Regenerate the serialization/export from a valid graph; retain the DOT payload |
 | `E_CONFIG` | Malformed TOML/YAML, invalid config root, or negative build-job setting | Correct the selected user config and its value types |
 | `E_TEMPLATE` | Missing/invalid profile, unclosed substitution/directive, or expression error while rendering | Check template syntax, context variables, and the rendered language's quoting |
@@ -115,7 +116,8 @@ Check whether the changed file is tracked:
 - `include_dirs:` does not track directory contents.
 - An action's `fs.read` or subprocess read does not add a graph input by itself.
 - Generator scripts and external tool identities need suitable tracking.
-- Process environment read during execution is not automatically a cache key.
+- Ambient environment in unsandboxed execution is not automatically a cache key;
+  declare process values through the target's captured `env:` map.
 
 Inspect `rattbuild graph --json`. The relevant action's input list should include
 the file or a producer relationship that explains it. Correct the declaration
@@ -203,3 +205,24 @@ When recording a reproducible failure, retain:
 Construction failures need the source spec, while frozen execution failures
 often need the graph and its referenced inputs. This distinction makes a
 reproduction substantially easier to investigate.
+
+## 17.14 Standard-library input failures
+
+The expanded modules reuse the language's existing codes. A diagnostic location
+inside `<stdlib:...>` identifies the embedded helper that checked the contract;
+the detailed message explains the invalid input.
+
+| Symptom | Code | What to check |
+| --- | --- | --- |
+| Wrong list/map/callback kind or codec argument type | `E_TYPE` | API annotations in chapter 6; `base64.encode` takes a string, not a byte list |
+| Missing, repeated, or unknown argument | `E_ARITY` | Exact parameter names and defaults |
+| Malformed JSON or invalid regex pattern | `E_RUNTIME` | Input syntax and Rattscript string escaping |
+| Base64 decode rejects apparently readable text | `E_RUNTIME` | Alphabet, required padding, whitespace, and unused pad bits |
+| Numeric operation or statistics request fails | `E_RUNTIME` | Checked integer bounds, domains, sample size, and quantile range |
+| `semver.parse` or `semver.bump` fails | `E_RUNTIME` | Complete version syntax and a major/minor/patch bump part |
+| A composed callback reaches a write or process call during construction | `E_PHASE_VIOLATION` | Move the invoking operation into an action; composition preserves phase checks |
+
+Use `semver.valid` before parsing user-supplied version strings. Use `dict.get`
+or `json.get` to supply explicit missing-value defaults. A stored `nil` is
+different from an absent key. The collection and data-processing walkthroughs
+in [chapters 20–23](20-collection-pipelines.md) show these checks in context.

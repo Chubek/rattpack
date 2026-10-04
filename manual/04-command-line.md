@@ -37,7 +37,7 @@ rattbuild [build [TARGET ...]] [OPTIONS]
 rattbuild graph [OPTIONS]
 rattbuild export --to=EXPORTER [OPTIONS]
 rattbuild clean [OPTIONS]
-rattbuild --init [--profile=NAME] [-C DIRECTORY]
+rattbuild --init [--profile=NAME] [--scaffold] [-C DIRECTORY]
 rattbuild [--init] --list-profiles
 ```
 
@@ -53,6 +53,7 @@ follow the `build` command. Namespaces form part of the name, for example
 | `-j`, `--jobs` | Nonnegative integer; `0` | Maximum simultaneous native-build actions; zero consults config, then CPU count |
 | `--warnings-as-errors` | Boolean flag | Promote configuration/spec warnings to failures, retaining their `W_*` codes |
 | `--init` | Boolean flag | Write a root spec from an initialization profile |
+| `--scaffold` | Boolean flag | With `--init`, also create the shipped profile's buildable source/package scaffold |
 | `--profile` | Profile name | Choose the profile for `--init`; default is `empty` |
 | `--list-profiles` | Boolean flag | List installed profile names and exit |
 | `--dot` | Boolean flag | Use DOT output for `graph` |
@@ -60,6 +61,7 @@ follow the `build` command. Namespaces form part of the name, for example
 | `--import` | Graph filename | Use a saved JSON/DOT graph instead of loading specifications |
 | `-o`, `--output` | Path | File for `graph`; destination directory for `export` |
 | `--to` | Exporter name or library path | Choose `cmake`, `gnumake`/`make`, `ninja`, `meson`, or a native exporter |
+| `--hermetic` | Boolean flag | Mark graph actions strict; enforce frozen input/tool identities and declared execution access |
 | `--dry-run` | Boolean flag | Preview native build work without executing actions |
 | `--version` | Boolean flag | Print application version and exit |
 
@@ -77,6 +79,7 @@ rattbuild build
 rattbuild build app generated-header -j 8
 rattbuild build math::library -C workspace
 rattbuild build --import saved.json
+rattbuild build --hermetic
 ```
 
 With no selected names, all graph actions are considered. With names, the
@@ -87,6 +90,11 @@ one target does not skip construction errors in other declarations.
 Native builds print `build NAME` for executed work and a final built/up-to-date
 count. A dry run counts stale actions as work that would be built and does not
 update cache entries.
+
+`--hermetic` also applies to graph capture and export, preserving strict action
+flags in the saved DAG. Strict subprocess execution requires a supported
+backend; pure Rattscript actions use interpreter-level file checks. See
+[chapter 25](25-hermetic-builds.md) for declarations and replay examples.
 
 ### `graph`
 

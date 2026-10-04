@@ -1,0 +1,9 @@
+# phase: construction
+import "base64"
+print(base64.encode("f"), base64.encode("fo"), base64.encode("foo"))
+print(base64.decode("Zg=="), base64.decode("Zm8="), base64.decode("Zm9v"))
+print(base64.encode("???"), base64.encode("???", url_safe: true))
+assert(base64.decode("Pz8_", url_safe: true) == "???")
+assert(base64.encode("") == "" and base64.decode("") == "")
+assert(base64.decode(base64.encode("λ雪\u0000")) == "λ雪\u0000")
+assert(base64.decode("/w==") == base64.decode("_w==", url_safe: true))

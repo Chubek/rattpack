@@ -1,6 +1,6 @@
 # 19. Practical recipes
 
-[Previous: Development](18-development.md) · [Contents](README.md)
+[Previous: Development](18-development.md) · [Contents](README.md) · [Next: Collection pipelines](20-collection-pipelines.md)
 
 Each recipe is an independent pattern. A complete `Rattspec` shown below belongs
 at its own project root; fragments should be adapted to an existing declaration
@@ -302,3 +302,10 @@ the graph for the external scheduler. Build-system freshness policies differ;
 re-export when recipes, configuration, helpers, or discovered source lists
 change. The generated project continues to require the recorded Rattpack host
 and referenced source paths.
+
+For larger Rattscript-only generators, continue with the new walkthroughs:
+[collection pipelines](20-collection-pipelines.md),
+[structured records and text](21-structured-data-and-text.md),
+[numeric reports](22-numeric-analysis.md), and
+[release metadata](23-versioned-release-workflows.md). Each includes a complete
+program or tracked action that can be adapted into a project.

@@ -1,0 +1,22 @@
+# phase: construction
+import "list" as sequence
+let original = [3, 1, 2, 1]
+let copied = sequence.copy(original)
+copied.append(9)
+assert(original == [3, 1, 2, 1])
+assert(sequence.slice(original, -100, 100) == original)
+assert(sequence.slice(original, 99) == [])
+assert(sequence.slice(original, 3, 1) == [])
+assert(sequence.slice(original, 0, -99) == [])
+assert(sequence.reverse([]) == [])
+assert(sequence.sort([]) == [])
+assert(sequence.chunks([], 2) == [])
+assert(sequence.chunks(original, 9223372036854775807) == [original])
+print(sequence.slice(original, -3, -1), sequence.reverse(original))
+print(sequence.unique(original), sequence.flatten([[1, 2], [], [3]]))
+print(sequence.chunks(original, 3), sequence.sort([10, 2, -1, 1]))
+let records = [{key: 1, name: "first"}, {key: 0, name: "zero"}, {key: 1, name: "second"}]
+let ordered = sequence.sort(records, fn(a, b) { return a.key < b.key })
+assert(ordered[1].name == "first" and ordered[2].name == "second")
+assert(records[0].name == "first")
+print(ordered)

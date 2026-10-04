@@ -1,0 +1,2 @@
+import "list"
+list.chunks([1, 2], 0)

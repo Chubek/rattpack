@@ -1,0 +1,56 @@
+# String-keyed maps; returned maps/lists are fresh, with shallow values.
+fn get(values: map, key: str, default = nil) {
+    if key in values { return values[key] }
+    return default
+}
+
+fn values(entries: map) -> list {
+    let result = []
+    for key in entries { result.append(entries[key]) }
+    return result
+}
+
+fn items(entries: map) -> list {
+    let result = []
+    for key in entries { result.append([key, entries[key]]) }
+    return result
+}
+
+fn from_items(entries: list) -> map {
+    let result = {}
+    for entry in entries {
+        let pair: list = entry
+        assert(len(pair) == 2, "dict.from_items needs key/value pairs")
+        let key: str = pair[0]
+        result[key] = pair[1]
+    }
+    return result
+}
+
+fn merge(left: map, right: map) -> map {
+    let result = {}
+    for key in left { result[key] = left[key] }
+    for key in right { result[key] = right[key] }
+    return result
+}
+
+fn pick(entries: map, selected: list) -> map {
+    let result = {}
+    for entry in selected {
+        let key: str = entry
+        if key in entries { result[key] = entries[key] }
+    }
+    return result
+}
+
+fn omit(entries: map, excluded: list) -> map {
+    let result = {}
+    for key in entries { if not (key in excluded) { result[key] = entries[key] } }
+    return result
+}
+
+fn map_values(entries: map, transform: fn) -> map {
+    let result = {}
+    for key in entries { result[key] = transform(entries[key]) }
+    return result
+}

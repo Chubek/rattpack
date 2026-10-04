@@ -61,6 +61,23 @@ string-conversion binding in that scope).
 | `env` | read-only configuration `get`, `has` |
 | `log` | `info`, `warn`, `error`, `debug` |
 | `collections` | pure Rattscript `map`, `filter`, `fold` |
+| `list` | shallow `copy`, bounded `slice`, `reverse`, stable `unique`, one-level `flatten`, `chunks`, stable comparator-based `sort` |
+| `dict` | map `get`, sorted `values`/`items`, `from_items`, right-biased `merge`, `pick`, `omit`, `map_values` |
+| `sets` | `union`, `intersection`, `difference`, `symmetric_difference`, `is_subset`, `is_superset`, `is_disjoint` |
+| `iter` | eager `take`, `drop`, `take_while`, `drop_while`, `enumerate`, `zip`, `product`, `scan`, short-circuiting `all`/`any`/`find`, `count` |
+| `functional` | unary `identity`, `constant`, `compose`, `pipe`, `negate`, `bind_first`, `repeat` |
+| `math` | `pi`, `e`, `abs`, `sign`, `min`, `max`, `clamp`, integer-exponent `pow`, `gcd`, `lcm`, `sqrt`, `floor`, `ceil`, `round`, `log`, `exp`, `sin`, `cos`, `tan`, `is_finite` |
+| `stats` | numeric `sum`, `mean`, `median`, interpolated `quantile`, population/sample `variance` and `stdev` |
+| `json` | strict `parse`, sorted-key `stringify` (optional pretty printing), nested `get` |
+| `regex` | `test`, capture-list `find`/`find_all`, `replace`, `split`, literal `escape` |
+| `base64` | RFC 4648 padded `encode`/`decode`, optional URL-safe alphabet |
+| `semver` | strict `valid`, component `parse`, build-independent `compare`, stable `sort`, `bump` |
+
+The additional modules are embedded from `stdlib/*.ratt`; no runtime source
+installation is needed. Their operations are deterministic and permitted during
+construction. Callbacks retain the caller's phase restrictions. See the
+[standard-library manual](../manual/06-standard-library.md#613-list-sequences)
+for signatures, examples, and edge-case semantics.
 
 Construction-phase `proc.run`, process environment reads, and filesystem writes
 raise `E_PHASE_VIOLATION`, including calls through aliases and closures. Action

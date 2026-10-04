@@ -11,7 +11,7 @@ errors. `--warnings-as-errors` promotes warnings without changing their codes.
 | `E_TYPE` | A value, operation, or annotation has the wrong type. `rattsc --lint` checks annotations before evaluation. | `e-type.ratt` |
 | `E_ARITY` | Missing, duplicated, or unknown function argument. Match the declared parameters. | `e-arity.ratt` |
 | `E_PHASE_VIOLATION` | An effectful operation was called during graph construction, including through an alias or helper. Move it into an action. | `e-phase.ratt` |
-| `E_RUNTIME` | Evaluation failed, such as division by zero, integer overflow, or invalid loop control. | `e-runtime.ratt` |
+| `E_RUNTIME` | Evaluation failed, such as division by zero, integer overflow, invalid loop control, malformed codec/regex input, or an invalid standard-library domain/count. | `e-runtime.ratt`, `stdlib-*-error.ratt` |
 | `E_IMPORT` | Missing/unknown/cyclic module, or an explicitly imported subordinate spec. Let the spec loader discover subordinate specs. | `e-import.ratt` |
 | `E_IDENTITY_MISMATCH` | File naming and identity declaration disagree. Subordinates require both `Rattspec.m` and `module()`. | `e-identity.ratt` |
 | `E_SPEC` | Invalid/missing project metadata or no declared targets. Supply a root identity and at least one target. | `e-spec.ratt` |

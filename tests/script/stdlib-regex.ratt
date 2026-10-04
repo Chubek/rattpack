@@ -1,0 +1,14 @@
+# phase: construction
+import "regex" as re
+print(re.test("Rattpack", "^ratt", flags: "i"), re.test("abc", "[0-9]+"))
+print(re.find("release-1.2", "([0-9]+)\\.([0-9]+)"), re.find("abc", "[0-9]+"))
+print(re.find_all("a1 b22", "([a-z])([0-9]+)"))
+print(re.replace("x=1;y=2", "([0-9]+)", "[$1]"))
+print(re.split("a, b; c", "[,;] *"))
+assert(re.find("ac", "a(b)?c") == ["ac", ""])
+assert(re.find_all("abc", "[0-9]+") == [])
+assert(re.find("雪 λ", "λ") == ["λ"])
+assert(re.test("a.b[c]$", "^" + re.escape("a.b[c]$") + "$"))
+assert(re.split("abc", ",") == ["abc"])
+assert(re.replace("abc", "[0-9]", "x") == "abc")
+assert(len(re.find_all("ab", "")) == 3)

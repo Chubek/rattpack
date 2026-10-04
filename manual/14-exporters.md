@@ -151,6 +151,13 @@ the original specs and without rereading their user config for action settings.
 An edited or even malformed current config file does not replace values stored
 inside a frozen action.
 
+The expanded embedded libraries can be used by captured actions without a
+separate runtime source installation. Helpers and composed callbacks are restored
+from their serialized scopes, and the host registers their native primitives.
+Graphs exported with `--hermetic` also preserve strict action flags, input/tool
+hashes, and captured process environments. See [chapter 25](25-hermetic-builds.md)
+for a complete frozen-report workflow and backend support.
+
 Source reads differ by when they occur:
 
 ```ratt

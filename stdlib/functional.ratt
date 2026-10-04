@@ -1,0 +1,34 @@
+# Unary function combinators. Captured callbacks remain serializable actions.
+fn identity(value) { return value }
+
+fn constant(value) -> fn { return fn(ignored) { return value } }
+
+fn compose(outer: fn, inner: fn) -> fn {
+    return fn(value) { return outer(inner(value)) }
+}
+
+fn pipe(transforms: list) -> fn {
+    let functions = transforms + []
+    for transform in functions { let checked: fn = transform }
+    return fn(value) {
+        let result = value
+        for transform in functions { result = transform(result) }
+        return result
+    }
+}
+
+fn negate(predicate: fn) -> fn { return fn(value) { return not predicate(value) } }
+
+fn bind_first(combine: fn, first) -> fn {
+    return fn(second) { return combine(first, second) }
+}
+
+fn repeat(transform: fn, count: int) -> fn {
+    assert(count >= 0, "functional.repeat count must be nonnegative")
+    return fn(value) {
+        let result = value
+        let i = 0
+        while i < count { result = transform(result); i += 1 }
+        return result
+    }
+}

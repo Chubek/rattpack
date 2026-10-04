@@ -1,0 +1,22 @@
+# Phobos regular expressions. Captures include the full match at index zero.
+fn test(value: str, pattern: str, flags: str = "") -> bool {
+    return _native.test(value, pattern, flags)
+}
+
+fn find(value: str, pattern: str, flags: str = "") {
+    return _native.find(value, pattern, flags)
+}
+
+fn find_all(value: str, pattern: str, flags: str = "") -> list {
+    return _native.find_all(value, pattern, flags)
+}
+
+fn replace(value: str, pattern: str, replacement: str, flags: str = "") -> str {
+    return _native.replace(value, pattern, replacement, flags)
+}
+
+fn split(value: str, pattern: str, flags: str = "") -> list {
+    return _native.split(value, pattern, flags)
+}
+
+fn escape(value: str) -> str { return _native.escape(value) }

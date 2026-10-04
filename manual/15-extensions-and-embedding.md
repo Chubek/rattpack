@@ -253,6 +253,12 @@ the default user config. A source label ending in `.in` enables preprocessing
 through the installed transform. Set an output callback when messages should
 be visible.
 
+The embedded collection/codec/math libraries use the normal snapshot path.
+`installStdlib` eagerly registers their native primitives before a saved action
+is thawed; source-module helpers and composed callbacks are restored from the
+captured object graph. [Chapter 24](24-writing-rattscript-libraries.md) explains
+how to build reusable modules and extend the embedded library registry.
+
 Use `Phase.construction` when a host is collecting deterministic declarations.
 Install its target functions and action handler explicitly, or use the existing
 specification loader. Use `Phase.execution` with appropriate write roots and

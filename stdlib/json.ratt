@@ -1,0 +1,19 @@
+# Strict JSON parsing and deterministic, sorted-key encoding.
+fn parse(value: str) { return _native.parse(value) }
+fn stringify(value, pretty: bool = false) -> str { return _native.stringify(value, pretty) }
+
+# Walk object keys / array indices without conflating missing values with null.
+fn get(value, path: list, default = nil) {
+    let current = value
+    for key in path {
+        if type(current) == "map" and type(key) == "str" {
+            if not (key in current) { return default }
+            current = current[key]
+        } else {
+            if type(current) != "list" or type(key) != "int" { return default }
+            if key < 0 or key >= len(current) { return default }
+            current = current[key]
+        }
+    }
+    return current
+}

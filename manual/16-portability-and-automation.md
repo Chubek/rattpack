@@ -98,24 +98,44 @@ directly executed external program is not constrained by those interpreter
 checks.
 
 These mechanisms do not provide a general network-isolation or fully hermetic
-environment promise. Model action inputs and explicit configuration so builds
-remain explainable even when tools can read other system state.
+environment promise in ordinary sandboxed mode. Strict `--hermetic` execution
+uses a separate backend path: POSIX requires working Bubblewrap isolation,
+while macOS and Win32 currently reject strict subprocess execution. Pure
+Rattscript strict actions can use declared-file checks on all backends. See
+[chapter 25](25-hermetic-builds.md).
 
 ## 16.5 Environment and temporary files
 
 Sandboxed POSIX/macOS subprocess execution supplies the action temporary path
 as `TMPDIR` and sets `PYTHONDONTWRITEBYTECODE=1`. Win32 supplies `TEMP` and `TMP`.
-The temporary directory is removed after the action attempt. Other process
-environment values normally remain available through the process layer.
+The temporary directory is removed after the action attempt. Normal sandboxed
+subprocesses receive a captured environment instead of inheriting every ambient
+variable. Defaults include construction-time `PATH`, `LANG=C`, `LC_ALL=C`,
+`TZ=UTC`, and `SOURCE_DATE_EPOCH=0`; Win32 also preserves required system
+variables. A target's `env:` map supplies explicit overrides.
 
 When `sandbox: false`, the scheduler runs the process directly rather than
 using that sandboxed-process wrapper. Do not assume the same temporary-variable
 overrides apply to an unsandboxed action.
 
-`proc.env` can read process environment during execution/standalone mode, but
-ambient values are not part of the native cache key automatically. For a value
-that determines graph recipes or should trigger rebuilding, put it in config
-and capture it through `env.get` during construction.
+`proc.env` reads that captured map inside a sandboxed action. It reads ambient
+values in standalone and unsandboxed execution, where those ambient values are
+not automatically part of the native cache key. The backend's temporary-directory
+overrides are applied to subprocesses; they are not new bindings in the map read
+by `proc.env`.
+
+For an explicit process value, declare it on the target:
+
+```ratt
+let configured = rule(name: "configured", output: "build/mode.txt",
+                      env: {MODE: "release"})
+action(configured) { fs.write("build/mode.txt", proc.env("MODE") + "\n") }
+```
+
+This is a fragment for a spec that imports `fs` and `proc`. For settings used to
+shape graph recipes, read config through `env.get` during construction and pass
+the chosen value to the target's `env:` map. Captured process values contribute
+to action identity and survive graph export/import.
 
 ## 16.6 Parallel resource ownership
 

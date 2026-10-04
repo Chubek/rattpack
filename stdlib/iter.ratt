@@ -1,0 +1,78 @@
+# Eager iteration helpers; callback phases are inherited from the caller.
+import "list" as sequence
+
+fn take(values: list, count: int) -> list {
+    assert(count >= 0, "iter.take count must be nonnegative")
+    return sequence.slice(values, 0, count)
+}
+
+fn drop(values: list, count: int) -> list {
+    assert(count >= 0, "iter.drop count must be nonnegative")
+    return sequence.slice(values, count)
+}
+
+fn take_while(values: list, predicate: fn) -> list {
+    let i = 0
+    while i < len(values) and predicate(values[i]) { i += 1 }
+    return sequence.slice(values, 0, i)
+}
+
+fn drop_while(values: list, predicate: fn) -> list {
+    let i = 0
+    while i < len(values) and predicate(values[i]) { i += 1 }
+    return sequence.slice(values, i)
+}
+
+fn enumerate(values: list, start: int = 0) -> list {
+    let result = []
+    let i = 0
+    while i < len(values) { result.append([start + i, values[i]]); i += 1 }
+    return result
+}
+
+fn zip(left: list, right: list) -> list {
+    let result = []
+    let i = 0
+    while i < len(left) and i < len(right) {
+        result.append([left[i], right[i]])
+        i += 1
+    }
+    return result
+}
+
+fn product(left: list, right: list) -> list {
+    let result = []
+    for a in left { for b in right { result.append([a, b]) } }
+    return result
+}
+
+fn scan(values: list, initial, combine: fn) -> list {
+    let result = [initial]
+    let accumulator = initial
+    for value in values {
+        accumulator = combine(accumulator, value)
+        result.append(accumulator)
+    }
+    return result
+}
+
+fn all(values: list, predicate: fn) -> bool {
+    for value in values { if not predicate(value) { return false } }
+    return true
+}
+
+fn any(values: list, predicate: fn) -> bool {
+    for value in values { if predicate(value) { return true } }
+    return false
+}
+
+fn find(values: list, predicate: fn, default = nil) {
+    for value in values { if predicate(value) { return value } }
+    return default
+}
+
+fn count(values: list, predicate: fn) -> int {
+    let result = 0
+    for value in values { if predicate(value) { result += 1 } }
+    return result
+}
