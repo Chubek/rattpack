@@ -1,0 +1,59 @@
+.TH RATT-LANGUAGE-SERVER 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
+.SH NAME
+ratt-language-server \- provide static Rattscript editor services over LSP
+.SH SYNOPSIS
+.B ratt-language-server
+.RB [ \--stdio ]
+.br
+.B ratt-language-server
+.RB { \--help " | " \-h " | " \--version }
+.SH DESCRIPTION
+.B ratt-language-server
+serves the Language Server Protocol using JSON-RPC messages on standard input
+and standard output. An editor normally starts it as a child process and
+exchanges Content-Length-framed messages. The default transport is standard
+I/O; \--stdio explicitly selects the same transport. There is no TCP listener.
+.PP
+Services include static diagnostics, completion, hover information, go-to
+definition, and document symbols for Rattscript. The server analyzes documents
+without executing build actions or evaluating script top-level statements.
+It handles document changes and imports to provide editor feedback.
+.PP
+Configure your editor's language-server command as ratt-language-server
+\--stdio. Rattpack ships editor add-ons under share/rattpack/addons in the
+installation prefix. Keep standard output dedicated to protocol messages;
+diagnostics from the server itself go to standard error.
+.SH OPTIONS
+.TP
+.B \--stdio
+Use standard input/output for LSP traffic. This is the default.
+.TP
+.B \-h, \--help
+Display usage and exit. Supply this option alone.
+.TP
+.B \--version
+Display the version and exit. Supply this option alone.
+.SH EXIT STATUS
+0 indicates help/version output, or a protocol exit following shutdown.
+1 indicates a server failure or termination without the shutdown handshake.
+2 indicates unsupported arguments. An editor should send shutdown, wait for
+its response, then send exit for an orderly termination.
+.SH EXAMPLES
+Editor command and arguments:
+.PP
+.nf
+ratt-language-server \--stdio
+.fi
+.PP
+Inspect usage without starting a session:
+.PP
+.nf
+ratt-language-server \--help
+.fi
+.SH SEE ALSO
+.BR rattsc (1),
+.BR rattbuild (1),
+.BR rattspec (1)
+.PP
+See the editor add-ons and development chapters of the installed Rattpack
+manual.

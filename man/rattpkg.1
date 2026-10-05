@@ -1,0 +1,102 @@
+.TH RATTPKG 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
+.SH NAME
+rattpkg \- resolve, fetch, and verify Rattpack package dependencies
+.SH SYNOPSIS
+.B rattpkg resolve
+.RB [ \--update ]
+.RB [ \--allow-floating ]
+.RB [ \-C " DIRECTORY" ]
+.br
+.B rattpkg fetch
+.RB [ \-C " DIRECTORY" ]
+.br
+.B rattpkg verify
+.RB [ \-C " DIRECTORY" ]
+.SH DESCRIPTION
+.B rattpkg
+reads the Rattscript Rattpkg manifest, resolves dependencies, and maintains a
+TOML lockfile and a content-addressed source cache. Exactly one command is
+required; there is no default operation or positional package selection.
+.PP
+Dependencies may come from a registry, HTTP(S), FTP, or Git. HTTP and FTP
+archives require a SHA-256 checksum. Git dependencies use a tag or revision;
+floating branches require explicit permission. A Git remote need not contain
+a Rattpkg: a package can be synthesized from its Rattspec or treated as raw
+sources. Supported archives are tar, tar.gz, tar.xz, and zip; traversal and
+archive link entries are rejected.
+.SH COMMANDS
+.TP
+.B resolve
+Read Rattpkg, obtain required content, and write Rattpkg.lock. A matching
+manifest fingerprint reuses an existing lockfile unless \--update is given;
+its pinned content is fetched and verified. Prints "resolved Rattpkg.lock".
+.TP
+.B fetch
+Read Rattpkg.lock, fill missing cache entries, and check existing entries.
+Does not choose newer versions or update the lockfile.
+Prints "packages fetched".
+.TP
+.B verify
+Re-hash all locked package trees. Does not download missing trees or repair
+changed ones. Prints "packages verified".
+.SH OPTIONS
+.TP
+.BI \-C " DIRECTORY" ", \--directory=" DIRECTORY
+Select the directory containing Rattpkg and Rattpkg.lock.
+Default: current directory.
+.TP
+.B \--update
+Resolve fresh selections rather than reusing a matching lockfile.
+Applies to resolve.
+.TP
+.B \--allow-floating
+Permit Git branch references when resolving new selections.
+.TP
+.B \-h, \--help
+Display help and exit.
+.TP
+.B \--version
+Display the version and exit.
+.PP
+Boolean long options accept negative spellings such as \--no-update.
+.SH FILES
+.TP
+.I Rattpkg
+Rattscript package manifest declaring package identity and dependencies.
+.TP
+.I Rattpkg.lock
+TOML lockfile containing immutable dependency selections. Commit it for
+applications; do not commit it for libraries.
+.TP
+.I $XDG_CACHE_HOME/rattpack/pkgs/NAME/HASH/
+Verified package source trees. On POSIX, XDG_CACHE_HOME defaults to ~/.cache.
+.TP
+.I $XDG_CONFIG_HOME/rattpack/Config.toml
+Configuration, including pkg.registry and pkg.mirrors. On POSIX,
+XDG_CONFIG_HOME defaults to ~/.config. Config.yaml is an alternative;
+TOML wins with W_DUAL_CONFIG if both exist.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Configuration base directory. Windows uses APPDATA instead.
+.TP
+.B XDG_CACHE_HOME
+Package cache base directory on POSIX.
+.SH EXIT STATUS
+0 indicates success, help, or version output; 1 indicates an application
+diagnostic, resolution, download, or verification failure; 2 indicates argument
+parsing failure. Diagnostics go to standard error.
+.SH EXAMPLES
+.nf
+rattpkg resolve
+rattpkg resolve \--update \-C workspace
+rattpkg resolve \--allow-floating
+rattpkg fetch
+rattpkg verify
+.fi
+.SH SEE ALSO
+.BR rattbuild (1),
+.BR rattsc (1),
+.BR rattspec (1)
+.PP
+The installed Rattpack manual describes manifests, registries, and lockfiles.

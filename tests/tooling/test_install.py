@@ -35,6 +35,8 @@ class InstallationTests(unittest.TestCase):
         for app in installer.APPLICATIONS:
             self.assertEqual((destination / "bin" / (app + installer.platform_names()[0])).read_bytes(),
                              b"new payload")
+            self.assertEqual((destination / "share/man/man1" / (app + ".1")).read_bytes(),
+                             (ROOT / "man" / (app + ".1")).read_bytes())
 
     @unittest.skipIf(os.name == "nt", "POSIX shell launcher")
     def test_shell_launcher_propagates_failure(self):
@@ -60,9 +62,13 @@ class InstallationTests(unittest.TestCase):
         (destination / "custom.conf").write_text("keep")
         for app in installer.APPLICATIONS:
             self.assertEqual((destination / "bin" / (app + installer.platform_names()[0])).read_bytes(), b"new payload")
+            (destination / "share/man/man1" / (app + ".1")).write_text("old manual")
         self.assertTrue((destination / "share/rattpack/templates/scaffold/Rattpkg.in").is_file())
         installer.install(plan, destination)
         self.assertEqual((destination / "custom.conf").read_text(), "keep")
+        for app in installer.APPLICATIONS:
+            self.assertEqual((destination / "share/man/man1" / (app + ".1")).read_bytes(),
+                             (ROOT / "man" / (app + ".1")).read_bytes())
 
     def test_dry_run_does_not_write(self):
         destination = self.root / "preview"
@@ -73,6 +79,28 @@ class InstallationTests(unittest.TestCase):
         prefix = self.root / "prefix"
         stage = self.root / "stage"
         self.assertEqual(installer.staged_prefix(prefix, stage), stage.joinpath(*prefix.parts[1:]))
+
+    def test_destdir_installs_manpages_without_writing_prefix(self):
+        prefix = self.root / "prefix"
+        stage = self.root / "stage"
+        self.assertEqual(installer.main(["--build-dir", str(self.build), "--prefix", str(prefix),
+                                         "--destdir", str(stage)]), 0)
+        self.assertFalse(prefix.exists())
+        destination = installer.staged_prefix(prefix, stage)
+        for app in installer.APPLICATIONS:
+            self.assertEqual((destination / "share/man/man1" / (app + ".1")).read_bytes(),
+                             (ROOT / "man" / (app + ".1")).read_bytes())
+
+    def test_build_stages_every_utility_manpage(self):
+        result = subprocess.run([os.sys.executable, str(ROOT / "tools/build-man.py"),
+                                 "--build-dir", str(self.build)], cwd=self.root,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual({path.name for path in (self.build / "man/man1").glob("*.1")},
+                         {app + ".1" for app in installer.APPLICATIONS})
+        for app in installer.APPLICATIONS:
+            self.assertEqual((self.build / "man/man1" / (app + ".1")).read_bytes(),
+                             (ROOT / "man" / (app + ".1")).read_bytes())
 
     def test_directory_conflict_is_preflighted(self):
         destination = self.root / "install"

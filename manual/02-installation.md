@@ -140,7 +140,7 @@ rattbuild --version
 ```
 
 Install the built applications, language server, shared library, profiles,
-templates, manuals, and editor add-ons with the repository installer (defaults
+templates, manuals, manpages, and editor add-ons with the repository installer (defaults
 to `~/.local`):
 
 ```sh
@@ -154,6 +154,13 @@ section 2.2. Use `--dry-run` to preview an existing build without copying files;
 `--destdir` stages the prefix for packaging. `--with-plugins` includes the native
 exporters and the `opencode-assist` plugin. On Windows, invoke
 `python tools/install.py` with the same options.
+
+Section 1 manpages for all five utilities are installed in
+`<prefix>/share/man/man1`. DUB builds and the self-hosted build also stage them
+in `build/man/man1`; no roff formatter is required for building or installing.
+Read an installed page with `man rattbuild`, `man rattpkg`, `man rattsc`,
+`man rattspec`, or `man ratt-language-server`. If a custom prefix is outside
+your system's manual search path, use `man -M /path/to/prefix/share/man rattbuild`.
 
 `rattspec assist` needs the assist plugin, which `--with-plugins` installs into
 `bin/plugins/`. It also needs OpenCode V2 on `PATH`; see

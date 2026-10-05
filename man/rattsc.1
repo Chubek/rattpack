@@ -1,0 +1,71 @@
+.TH RATTSC 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
+.SH NAME
+rattsc \- interpret, lint, and test Rattscript
+.SH SYNOPSIS
+.B rattsc
+.RI [ FILE ]
+.br
+.B rattsc \--lint
+.I FILE
+.br
+.B rattsc \-e
+.I SCRIPT
+.br
+.B rattsc \--test
+.I DIRECTORY
+.SH DESCRIPTION
+.B rattsc
+is the standalone tree-walking Rattscript interpreter, interactive REPL,
+annotation linter, and golden-test runner. Select one mode per invocation.
+With a file, the evaluator's working directory is that file's directory.
+Inline evaluation and the REPL use the invoking directory. Files ending in .in
+are preprocessed as Rattscript templates before running or linting.
+.PP
+Rattscript supports dynamic values, optional type annotations, lexical
+functions, control flow, imports, and namespaced standard-library modules.
+.SH OPTIONS
+.TP
+.B \--lint
+Check FILE and statically imported source modules without executing module
+top-level statements. Template substitutions required to parse .in files
+are evaluated. Linting is not a full build-spec validator or execution
+simulator.
+.TP
+.BI \-e " SCRIPT" ", \--eval=" SCRIPT
+Evaluate a source string. Quote the string to protect it from shell expansion.
+.TP
+.BI \--test= DIRECTORY
+Recursively run .ratt golden fixtures and compare captured output byte-for-byte
+with sibling .expected files. A diagnostic contributes its code to captured
+output. Missing expected files, mismatches, or an empty directory fail.
+.TP
+.B \-h, \--help
+Display help and exit.
+.TP
+.B \--version
+Display the version and exit.
+.SH INTERACTIVE USE
+With no arguments, display the ratt> prompt. Bindings persist between inputs;
+the last statement's value is printed unless it is nil. Use :q, :quit, or
+end-of-input to exit. Unmatched opening braces cause a continuation prompt,
+"... ". Brace counting also sees braces in strings; use files for complicated
+multiline input. Runtime diagnostics are displayed and leave the prompt usable.
+.SH EXIT STATUS
+0 indicates success, help, or version output; 1 indicates an application
+diagnostic or failing golden tests; 2 indicates argument parsing failure.
+Diagnostics go to standard error; script output goes to standard output.
+.SH EXAMPLES
+.nf
+rattsc hello.ratt
+rattsc \--lint tools/helpers.ratt
+rattsc \-e 'fn square(x: int) -> int { return x * x } print(square(7))'
+rattsc \--test tests/script
+.fi
+.SH SEE ALSO
+.BR rattbuild (1),
+.BR rattpkg (1),
+.BR rattspec (1),
+.BR ratt-language-server (1)
+.PP
+The installed Rattpack manual contains the language and standard-library
+reference.

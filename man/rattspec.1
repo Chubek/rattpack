@@ -1,0 +1,92 @@
+.TH RATTSPEC 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
+.SH NAME
+rattspec \- create or update Rattpack specifications using OpenCode
+.SH SYNOPSIS
+.B rattspec assist
+.I REQUEST
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+.B rattspec assist
+creates or updates the root Rattspec and Rattpkg files from a natural-language
+request. Quote REQUEST when it contains spaces or shell metacharacters.
+It requires OpenCode V2 and the matching opencode-assist native plugin.
+.PP
+The command reads existing root files and a bounded inventory of source paths,
+sends them through the opencode api CLI to OpenCode's experimental generation
+endpoint, and accepts complete replacement files in a JSON proposal.
+Unchanged files can be omitted; missing root files must be created.
+.PP
+Before writing, the whole proposal must parse and lint, declare exactly one
+project/package identity, and include at least one target in Rattspec.
+The real package manifest reader validates dependency sources, pins, and
+checksums. Generated Rattscript is never evaluated. Files are published
+atomically only if their existing contents still match the initial read.
+.PP
+The command does not resolve dependencies or write Rattpkg.lock. Follow-up
+steps may appear in the generated summary.
+.SH OPTIONS
+.TP
+.BI \-C " DIRECTORY" ", \--directory=" DIRECTORY
+Project directory. Default: current directory.
+.TP
+.BI \--plugin= PATH
+Assist plugin library. Default: plugins/opencode-assist with the platform's
+shared-library suffix, beside the rattspec executable. The plugin must match
+the host's D compiler family/major and shared runtime.
+.TP
+.BI \--opencode= EXECUTABLE
+OpenCode executable name or path. Default: opencode, found using PATH.
+.TP
+.BI \--server= URL
+Explicit OpenCode server URL. By default, use the CLI's discovery and
+authentication.
+.TP
+.BI \--model= MODEL
+Select provider/model or provider/model#variant.
+Default: OpenCode's configured model.
+.TP
+.BI \--timeout= SECONDS
+IPC deadline. Default: 120 seconds. Must be a positive integer no larger than
+2147483647.
+.TP
+.B \--dry-run
+Generate and validate the proposal, print it as JSON, and write no files.
+The OpenCode request still runs.
+.TP
+.B \-h, \--help
+Display help and exit.
+.TP
+.B \--version
+Display the version and exit.
+.PP
+Boolean long options accept negative spellings such as \--no-dry-run.
+.SH FILES
+.TP
+.I Rattspec
+Root project identity and build targets.
+.TP
+.I Rattpkg
+Root package identity and dependencies.
+.TP
+.I PREFIX/bin/plugins/opencode-assist.so
+Default plugin location on POSIX. macOS uses .dylib and Windows uses .dll.
+Install the plugin using install.sh \--with-plugins, or select \--plugin.
+.SH ENVIRONMENT
+.TP
+.B PATH
+Search path for the default OpenCode executable.
+.SH EXIT STATUS
+0 indicates success, help, or version output; 1 indicates an application
+diagnostic or assist failure; 2 indicates argument parsing failure.
+Diagnostics go to standard error. E_ASSIST reports failed or timed-out requests,
+invalid responses, and concurrent edits; E_PLUGIN_ABI reports plugin failures.
+.SH EXAMPLES
+.nf
+rattspec assist 'add these libraries: fmt and zlib'
+rattspec assist 'build a C library and an executable that links it' \-C workspace
+rattspec assist 'make this a monorepo' \--dry-run
+.fi
+.SH SEE ALSO
+.BR rattbuild (1),
+.BR rattpkg (1),
+.BR rattsc (1)

@@ -20,6 +20,7 @@ jobs:
         with:
           compiler: ${{ matrix.compiler }}
       - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build meson libssl-dev vim neovim
+      - run: python3 -m unittest discover -s tests/tooling
       - run: dub build -c rattbuild --compiler="$DC"
       - if: matrix.dc == 'ldc2'
         run: ./build/rattbuild build --warnings-as-errors

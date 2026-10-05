@@ -21,6 +21,9 @@ let runtime = rule(name: "librattpack", output: "build/" + toolchain.runtime_lib
   command: [python, "tools/dogfood.py", "--compiler", compiler.command, "library"],
   toolchain: compiler.fingerprint, sandbox: false)
 for app in ["rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server"] {
+  rule(name: "man-" + app, output: "build/man/man1/" + app + ".1",
+    inputs: ["man/" + app + ".1", "tools/build-man.py"],
+    command: [python, "tools/build-man.py", app + ".1"])
   rule(name: app, output: "build/" + app + toolchain.executable_suffix, deps: [runtime],
     inputs: ["source/apps/" + app + "/main.d", "tools/dogfood.py"],
     command: [python, "tools/dogfood.py", "--compiler", compiler.command, "app", app], toolchain: compiler.fingerprint)

@@ -1,0 +1,163 @@
+.TH RATTBUILD 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
+.SH NAME
+rattbuild \- construct, execute, and export Rattscript build graphs
+.SH SYNOPSIS
+.B rattbuild
+.RB [ build
+.RI [ TARGET ...]]
+.RI [ OPTIONS ]
+.br
+.B rattbuild graph
+.RI [ OPTIONS ]
+.br
+.B rattbuild export
+.BI \--to= EXPORTER
+.RI [ OPTIONS ]
+.br
+.B rattbuild clean
+.RI [ OPTIONS ]
+.br
+.B rattbuild \--init
+.RB [ \--profile= NAME]
+.RB [ \--scaffold ]
+.RB [ \-C " DIRECTORY" ]
+.br
+.B rattbuild \--list-profiles
+.SH DESCRIPTION
+.B rattbuild
+loads the root Rattspec and automatically discovers subordinate
+Rattspec.m files.
+It evaluates Rattscript to construct a deterministic build DAG, then executes
+its actions incrementally and in parallel or exports the graph to another build
+system. Side effects during construction are rejected; action blocks run during
+execution. Package dependencies must already have been fetched by
+.BR rattpkg (1).
+.SH COMMANDS
+.TP
+.B build [TARGET ...]
+Build selected targets and their prerequisites, or all targets when no names
+are supplied. This is the default command. Namespaces are part of target names,
+for example core::codec. The whole spec tree is validated even for a selected
+target. Prints executed work and built/up-to-date counts.
+.TP
+.B graph
+Serialize the graph as JSON, or DOT with
+.BR \--dot .
+No build actions run. Output goes to standard output unless
+.B \-o
+is supplied. Preserve the embedded canonical payload in DOT files for lossless
+reimport.
+.TP
+.B export
+Export the complete frozen graph using the exporter selected by
+.BR \--to .
+Exporters consume the DAG without evaluating Rattscript again. The default
+output directory is build/export/EXPORTER under the selected project.
+Generated build files invoke the recorded Rattpack host to run frozen actions.
+.TP
+.B clean
+Remove graph-declared generated files, the graph's build cache, and its local
+\&.rattpack working directory. Cleaning applies to the whole graph and does not
+remove cached packages.
+.SH OPTIONS
+.TP
+.BI \-C " DIRECTORY" ", \--directory=" DIRECTORY
+Select the project root containing Rattspec. Default: current directory.
+This does not change the shell working directory: relative CLI paths for
+\--import, \-o, and a plugin \--to are relative to the invoking directory.
+Imported graphs retain their recorded root.
+.TP
+.BI \-j " N" ", \--jobs=" N
+Maximum simultaneous actions. Default: 0, which consults build.jobs in the
+configuration, then the logical CPU count. N must be nonnegative.
+.TP
+.B \--warnings-as-errors
+Treat configuration and specification warnings as failures.
+.TP
+.B \--init
+Create a root Rattspec using the selected initialization profile.
+.TP
+.BI \--profile= NAME
+Choose an initialization profile. Default: empty. Shipped profiles are c-exe,
+c-lib, cxx-exe, cxx-lib, d-exe, d-lib, monorepo, and empty.
+.TP
+.B \--scaffold
+With \--init, also create the profile's buildable sources and package scaffold.
+.TP
+.B \--list-profiles
+List available profiles and exit, including when combined with \--init.
+Listing and initialization install missing shipped profiles in the user profile
+directory.
+.TP
+.B \--dot
+Use DOT output for graph. Takes precedence over \--json.
+.TP
+.B \--json
+Request JSON graph output, which is the default.
+.TP
+.BI \--import= FILE
+Read a saved JSON or DOT graph instead of loading specifications.
+.TP
+.BI \-o " PATH" ", \--output=" PATH
+Write graph output to a file, or exporter output to a directory.
+.TP
+.BI \--to= EXPORTER
+Select cmake, gnumake (alias make), ninja, meson, or a native exporter library
+path. Use an explicit output directory when selecting a library path.
+.TP
+.B \--hermetic
+Mark actions strict and enforce frozen input/tool identities and declared
+execution access. Graph capture and export preserve these flags. Strict
+subprocess execution requires a supported platform sandbox.
+.TP
+.B \--dry-run
+Preview stale build actions without executing them or updating the cache.
+.TP
+.B \-h, \--help
+Display help and exit.
+.TP
+.B \--version
+Display the version and exit.
+.PP
+Boolean long options also accept the parser's negative spelling, such as
+\--no-dry-run. Internal __run-action options are reserved for generated exporters.
+.SH FILES
+.TP
+.I Rattspec
+Root specification with project identity and at least one target.
+.TP
+.I Rattspec.m
+Automatically discovered subordinate specification; must declare module().
+Nested independent projects must be declared as monorepo members, vendored
+projects, or ignored paths in the root specification.
+.TP
+.I $XDG_CONFIG_HOME/rattpack/Config.toml
+Configuration environment. Defaults to ~/.config/rattpack/Config.toml on POSIX.
+Config.yaml is accepted; TOML wins if both exist and emits W_DUAL_CONFIG.
+.TP
+.I $XDG_CONFIG_HOME/rattpack/buildprof/*.in
+User initialization profiles, preprocessed as Rattscript templates.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Base directory for configuration and initialization profiles.
+Windows uses the rattpack directory under APPDATA.
+.SH EXIT STATUS
+0 indicates success, help, or version output; 1 indicates an application
+diagnostic or failed action; 2 indicates argument parsing failure.
+Diagnostics go to standard error.
+.SH EXAMPLES
+.nf
+rattbuild build app \-j 8
+rattbuild \--init \--profile=cxx-exe \--scaffold
+rattbuild graph \--dot \-o graph.dot
+rattbuild build \--import graph.dot
+rattbuild export \--to=ninja \-o generated/ninja
+.fi
+.SH SEE ALSO
+.BR rattpkg (1),
+.BR rattsc (1),
+.BR rattspec (1),
+.BR ratt-language-server (1)
+.PP
+The Rattpack manual is installed under share/rattpack/manual in the prefix.

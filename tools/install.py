@@ -30,6 +30,10 @@ def installation_plan(build, with_plugins=False):
     if with_plugins:
         plan.extend((build / "plugins" / (name + plugin_suffix),
                      Path("bin/plugins") / (name + plugin_suffix)) for name in PLUGINS)
+    # Install authored sources so prebuilt/custom build directories need no
+    # separate documentation build. DUB and Rattspec also stage these in build/.
+    plan.extend((ROOT / "man" / (app + ".1"), Path("share/man/man1") / (app + ".1"))
+                for app in APPLICATIONS)
     for directory in ("profiles", "templates", "manual", "docs", "addons"):
         plan.extend((path, Path("share/rattpack") / path.relative_to(ROOT))
                     for path in sorted((ROOT / directory).rglob("*"))
@@ -100,7 +104,7 @@ def install(plan, destination):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prefix", type=Path, default=Path.home() / ".local",
-                        help="install prefix (default: ~/.local); applications go in bin")
+                        help="install prefix (default: ~/.local); applications go in bin, manpages in share/man/man1")
     parser.add_argument("--destdir", type=Path, help="package staging root prepended to prefix")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build",
                         help="directory containing the applications, language server and shared runtime")

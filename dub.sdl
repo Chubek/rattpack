@@ -13,6 +13,8 @@ dflags "-link-defaultlib-shared" platform="ldc"
 dflags "-defaultlib=libphobos2.so" platform="linux-dmd"
 lflags "-rpath=$$ORIGIN" platform="linux"
 lflags "-rpath=@loader_path" platform="osx"
+postBuildCommands "python3 tools/build-man.py" platform="posix"
+postBuildCommands "python tools/build-man.py" platform="windows"
 
 configuration "rattbuild" {
     targetType "executable"
