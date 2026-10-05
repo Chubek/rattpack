@@ -1,0 +1,14 @@
+PROJECT_NAME           = "NuPERF"
+PROJECT_BRIEF          = "Extensible Multi-Target Perfect Hashing Library"
+OUTPUT_DIRECTORY       = docs
+INPUT                  = include/nuperf src docs/frontpage.md docs/manual
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = docs/frontpage.md
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+FILE_PATTERNS          = *.h *.cpp *.md
+EXTENSION_MAPPING      = h=C++
+MARKDOWN_SUPPORT       = YES

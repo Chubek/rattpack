@@ -1,0 +1,83 @@
+# Doxyfile for Ekipp Preprocessor Library
+
+PROJECT_NAME           = "Ekipp"
+PROJECT_NUMBER         = "2.0.0"
+PROJECT_BRIEF          = "A modern, extensible C++17 text preprocessor library"
+OUTPUT_DIRECTORY       = .
+CREATE_SUBDIRS         = NO
+
+INPUT                  = ../include/ekipp.hpp \
+                         frontpage.md \
+                         manual/chapter1_introduction.md \
+                         manual/chapter2_basic_usage.md \
+                         manual/chapter3_directives.md \
+                         manual/chapter4_advanced_features.md \
+                         manual/chapter5_extending.md
+
+USE_MDFILE_AS_MAINPAGE = frontpage.md
+RECURSIVE              = NO
+FILE_PATTERNS          = *.hpp *.md
+EXCLUDE_PATTERNS       = */build/* */.git/*
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+HTML_COLORSTYLE_HUE    = 220
+HTML_COLORSTYLE_SAT    = 100
+HTML_COLORSTYLE_GAMMA  = 80
+HTML_TIMESTAMP         = YES
+HTML_DYNAMIC_SECTIONS  = YES
+
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_RTF           = NO
+GENERATE_XML           = NO
+
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+PREDEFINED             = __cplusplus=201703L
+
+CLASS_DIAGRAMS         = YES
+HAVE_DOT               = NO
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO
+
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MULTILINE_CPP_IS_BRIEF = NO
+
+OPTIMIZE_OUTPUT_FOR_C  = NO
+BUILTIN_STL_SUPPORT    = YES
+CPP_CLI_SUPPORT        = NO
+DISTRIBUTE_GROUP_DOC   = NO
+SUBGROUPING            = YES
+
+ALPHABETICAL_INDEX     = YES
+COLS_IN_ALPHA_INDEX    = 5
+
+GENERATE_TREEVIEW      = YES
+TREEVIEW_WIDTH         = 250
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+REFERENCES_LINK_SOURCE = YES
+
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+
+EXAMPLE_PATH           = ../examples
+EXAMPLE_PATTERNS       = *.cpp
+EXAMPLE_RECURSIVE      = NO

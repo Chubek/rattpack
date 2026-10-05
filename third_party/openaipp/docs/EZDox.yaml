@@ -1,0 +1,26 @@
+project: "OpenAIpp"
+version: "0.1.0"
+sources:
+  - ../include
+includes:
+  - ../include
+excludes:
+  - ../build
+  - ../third_party
+targets:
+  - HTML
+  - LaTeX
+markups:
+  - Markdown
+frontpage: FrontPage.md
+manual: manual
+output: build/docs
+doxygen_compat: true
+strict: false
+commands:
+  build: "ezdox-cli generate -C docs/EZDox.yaml -O build/docs"
+  clean: "rm -rf build/docs"
+pipelines:
+  rebuild:
+    - clean
+    - build

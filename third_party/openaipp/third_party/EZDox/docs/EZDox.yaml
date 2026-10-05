@@ -1,0 +1,26 @@
+project: "EZDox"
+version: "0.2.0"
+sources:
+  - ../src
+  - ../include
+includes:
+  - ../include
+excludes:
+  - ../build
+  - ../third_party
+targets:
+  - HTML
+markups:
+  - Markdown
+frontpage: frontpage.md
+manual: manual
+output: build/docs
+doxygen_compat: true
+strict: false
+commands:
+  build: "ezdox-cli generate -C docs/EZDox.yaml -O build/docs"
+  clean: "rm -rf build/docs"
+pipelines:
+  rebuild:
+    - clean
+    - build
