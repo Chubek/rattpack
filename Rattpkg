@@ -20,4 +20,6 @@ deps {
   dep "libddoc" from: git("https://github.com/dlang-community/libddoc.git"), tag: "v0.8.0"
   dep "dcd" from: git("https://github.com/dlang-community/DCD.git"), tag: "v0.16.2"
   dep "inifiled" from: git("https://github.com/burner/inifile-D.git"), tag: "v1.3.3"
+  dep "satie" from git("https://github.com/Chubek/satie"), tag: "v0.1.0"
+  dep "openaipp" from git("https://github.com/Chubek/openaipp"), tag: "v0.1.0"
 }
