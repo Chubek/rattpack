@@ -111,9 +111,13 @@ def openai_assist_bridge():
 
 def import_flags():
     # DUB's description metadata must stay within the writable build tree.
+    # Use a writable cache directory since the project root may be read-only.
+    dub_home = os.environ.get("DUB_HOME", str(root / "build" / ".dub_cache"))
+    env = os.environ.copy()
+    env["DUB_HOME"] = dub_home
     description = json.loads(subprocess.check_output(
         ["dub", "describe", "-c", "rattbuild", "--compiler=" + compiler,
-         "--dest=" + str(root / "build")], cwd=root, text=True))
+         "--dest=" + str(root / "build")], cwd=root, text=True, env=env))
     flags = []
     for package in description["packages"]:
         for field, prefix in (("importPaths", "-I"), ("stringImportPaths", "-J")):
