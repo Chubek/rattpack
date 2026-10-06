@@ -436,6 +436,53 @@ deps {{
         run([BUILD / "rattpkg", "verify", "-C", project])
         check("registry semantic-version constraints, transitive resolution, and backtracking")
 
+        # Package cycles are legal. The newest candidate contradicts the
+        # transitive requirements, so SAT must select the older cycle.
+        for name, version, deps in [
+                ("cycle-a", "1.0.0", 'dep "cycle-b" from: registry, version: "^1.0"'),
+                ("cycle-a", "2.0.0", 'dep "cycle-b" from: registry, version: "^1.0"; '
+                 'dep "orphan" from: registry, version: "*"'),
+                ("cycle-b", "1.0.0", 'dep "cycle-a" from: registry, version: "^1.0"'),
+                ("orphan", "1.0.0", 'dep "orphan" from: registry, version: "*"')]:
+            package, checksum = archive(server, name, version, "deps { " + deps + " }\n")
+            versions.setdefault(name, []).append({"version": version,
+                "url": url + "/" + package.name, "sha256": checksum})
+        for name in ("cycle-a", "cycle-b", "orphan"):
+            put(server, name + "/index.json", json.dumps({"versions": versions[name]}))
+        cyclic = work / "cyclic-packages"
+        put(cyclic, "Rattpkg", 'package(name: "cycles", version: "1.0.0")\n'
+            'deps { dep "cycle-a" from: registry, version: "*" }')
+        run([BUILD / "rattpkg", "resolve", "-C", cyclic])
+        lock = (cyclic / "Rattpkg.lock").read_bytes()
+        entries = tomllib.loads(lock.decode())["package"]
+        assert {p["name"]: p["version"] for p in entries} == {
+            "cycle-a": "1.0.0", "cycle-b": "1.0.0"}
+        run([BUILD / "rattpkg", "verify", "-C", cyclic])
+        run([BUILD / "rattpkg", "resolve", "-C", cyclic])
+        assert (cyclic / "Rattpkg.lock").read_bytes() == lock
+        put(cyclic, "Rattpkg", 'package(name: "cycles", version: "1.0.0")\n'
+            'deps { dep "cycle-a" from: registry, version: "^2.0" }')
+        assert "E_PACKAGE" in run([BUILD / "rattpkg", "resolve", "-C", cyclic], ok=False).stdout
+        assert (cyclic / "Rattpkg.lock").read_bytes() == lock
+        check("SAT resolves compatible package cycles and rejects contradictory cycles atomically")
+
+        # Two independently valid packages can require different immutable
+        # snapshots of the same Git dependency. Exclusion must apply to sources
+        # and revisions as well as registry version numbers.
+        head = run(["git", "-C", remote, "rev-parse", "HEAD"]).stdout.strip()
+        pins = []
+        for name, pin in [("pin-left", 'tag: "v1"'), ("pin-right", f'rev: "{head}"')]:
+            package, checksum = archive(server, name, deps=
+                f'deps {{ dep "raw" from: git("{remote}"), {pin} }}\n')
+            pins.append(f'dep "{name}" from: http("{url}/{package.name}"), sha256: "{checksum}"')
+        conflicting = work / "conflicting-git-pins"
+        put(conflicting, "Rattpkg", 'package(name: "pins", version: "1.0.0")\ndeps { '
+            + "; ".join(pins) + " }")
+        error = run([BUILD / "rattpkg", "resolve", "-C", conflicting], ok=False).stdout
+        assert "E_PACKAGE" in error and "no compatible resolution" in error, error
+        assert not (conflicting / "Rattpkg.lock").exists()
+        check("SAT rejects conflicting transitive Git revisions")
+
         zipped = server / "zip.zip"
         with zipfile.ZipFile(zipped, "w", zipfile.ZIP_DEFLATED) as output:
             output.writestr("package/Rattpkg", 'package(name: "zip", version: "1.0.0")\n')
@@ -468,6 +515,12 @@ def test_distribution(work):
     for app in ("rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server"):
         assert "0.1.0" in run([installed / app, "--version"], cwd=work).stdout
     assert "42" in run([installed / "rattsc", "-e", "print(6 * 7)"], cwd=work).stdout
+    cyclic = work / "installed-cycle"
+    spec(cyclic, 'project(name: "cycle", version: "1", kind: "single")\n'
+         'rule(name: "a", output: "out/a", deps: ["b"], command: ["true"])\n'
+         'rule(name: "b", output: "out/b", deps: ["a"], command: ["true"])\n')
+    error = run([installed / "rattbuild", "graph", "-C", cyclic], cwd=work, ok=False).stdout
+    assert "E_CYCLE" in error and "Satie suggests reviewing dependency b -> a" in error, error
     assert (prefix / "share/rattpack/templates/scaffold/Rattpkg.in").is_file()
     assert (prefix / "share/rattpack/addons/neovim/ratt-languages/lua/ratt/init.lua").is_file()
     assert (prefix / "share/rattpack/addons/sublime/plugin.py").is_file()

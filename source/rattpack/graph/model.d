@@ -3,6 +3,7 @@ module rattpack.graph.model;
 import rattpack.content.hash;
 import rattpack.serialization;
 import rattpack.diagnostic;
+import rattpack.constraints : solveConstraints;
 import rattpack.rt.sys : buildProcessEnvironment;
 import std.json;
 import std.algorithm;
@@ -139,17 +140,23 @@ class Graph
     {
         Action[] result;
         int[string] state;
+        string[] stack;
         void visit(string name)
         {
             if (!(name in actions))
                 fail("E_TARGET", "unknown target '" ~ name ~ "'");
             if (state.get(name, 0) == 1)
-                fail("E_CYCLE", "dependency cycle at " ~ name);
+            {
+                auto start = stack.countUntil(name);
+                fail("E_CYCLE", describeCycle(stack[start .. $]));
+            }
             if (state.get(name, 0) == 2)
                 return;
             state[name] = 1;
+            stack ~= name;
             foreach (dependency; prerequisites(actions[name]))
                 visit(dependency);
+            stack.length--;
             state[name] = 2;
             result ~= actions[name];
         }
@@ -327,6 +334,54 @@ class Graph
         fail("E_GRAPH", "missing Rattpack graph payload");
         return null;
     }
+}
+
+/// Ask Satie for a maximal feasible subset of the cycle's ordering edges.
+/// Edges are guarded strict inequalities over unary ranks. Suggested repairs
+/// are diagnostic only: dropping an artifact dependency would change the build.
+private string describeCycle(string[] cycle) @safe
+{
+    auto n = cycle.length;
+    if (n > 128)
+        return "dependency cycle: " ~ (cycle ~ cycle[0]).join(" -> ");
+    int rank(size_t node, size_t level) @safe
+    {
+        return cast(int)(n + node * (n - 1) + level);
+    }
+
+    int[][] clauses;
+    int[] edges;
+    foreach (node; 0 .. n)
+    {
+        int edge = cast(int) node + 1;
+        edges ~= edge;
+        auto dependency = (node + 1) % n;
+        if (n == 1)
+        {
+            clauses ~= [-edge];
+            continue;
+        }
+        clauses ~= [-edge, rank(node, 1)];
+        clauses ~= [-edge, -rank(dependency, n - 1)];
+        foreach (level; 1 .. n - 1)
+        {
+            clauses ~= [-rank(node, level + 1), rank(node, level)];
+            clauses ~= [-edge, -rank(dependency, level), rank(node, level + 1)];
+        }
+    }
+    int[] retained;
+    auto message = "dependency cycle: " ~ (cycle ~ cycle[0]).join(" -> ");
+    try
+    {
+        if (solveConstraints(clauses, edges, retained))
+            foreach (i, edge; edges)
+                if (!retained.canFind(edge))
+                    message ~= "; Satie suggests reviewing dependency "
+                        ~ cycle[i] ~ " -> " ~ cycle[(i + 1) % n] ~ " to break this cycle";
+    }
+    catch (Exception error)
+        message ~= "; Satie suggestion unavailable: " ~ error.msg;
+    return message;
 }
 
 import std.array : array;

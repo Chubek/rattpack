@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Use the vendored Satie DependencySAT plugin in a standalone C++20 helper for
+  deterministic package constraint solving, compatible package cycles, and
+  build-cycle ordering repair suggestions. Keep the shared runtime D-only.
+  Add a native-only plugin-host build option to the vendored Satie header.
+- Add `tools/ls2rattpkg.py` for pinned Git manifests from library directories,
+  with GitHub search, `.env` authentication and DuckDuckGo repository fallback.
+
 - Implement Vim, Neovim, and Sublime Text add-ons with canonical filename and
   template detection, syntax highlighting, indentation, and editor linting.
 - Add `ratt-language-server` with UTF-16 document synchronization, static

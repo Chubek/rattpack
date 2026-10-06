@@ -2,7 +2,9 @@
 
 #include "Satie.hpp"
 
+#ifndef SATIE_NO_LUA_PLUGIN
 #include "../third_party/QaMRpp/include/QaMRpp.hpp"
+#endif
 
 #include <algorithm>
 #include <charconv>
@@ -116,6 +118,7 @@ private:
   std::vector<std::unique_ptr<Plugin>> plugins_;
 };
 
+#ifndef SATIE_NO_LUA_PLUGIN
 namespace detail
 {
 inline std::string value_to_string (const qamrpp::ValuePtr &value)
@@ -341,5 +344,6 @@ inline void install_lua_library (qamrpp::Context &context, PluginHost &host)
 {
   LuaPlugin::install_library (context, host);
 }
+#endif
 
 } // namespace satie

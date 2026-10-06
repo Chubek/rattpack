@@ -10,6 +10,7 @@ import rattpack.script.parser;
 import rattpack.script.ast;
 import rattpack.script.value;
 import rattpack.diagnostic;
+import rattpack.constraints : solveConstraints;
 import rattpack.rt.sys;
 import std.file;
 import std.path;
@@ -68,11 +69,8 @@ class PackageManager
                 return lock;
             }
         }
-        Dependency[][string] requirements;
-        foreach (dep; manifest.dependencies)
-            requirements[dep.name] ~= dep;
         Resolved[string] selection;
-        if (!solve(requirements, null, selection))
+        if (!solve(manifest.dependencies, selection))
             fail("E_PACKAGE", "dependency constraints have no compatible resolution");
         Lockfile lock;
         lock.project = manifest.name;
@@ -107,39 +105,109 @@ class PackageManager
         return true;
     }
 
-    private bool solve(Dependency[][string] requirements,
-            Resolved[string] chosen, ref Resolved[string] result)
+    private bool solve(Dependency[] roots, ref Resolved[string] result)
     {
-        foreach (name, selected; chosen)
-            if (name in requirements && !accepts(selected, requirements[name]))
-                return false;
-        string next;
-        foreach (name; requirements.keys.sort)
-            if (!(name in chosen))
-            {
-                next = name;
-                break;
-            }
-        if (!next.length)
-        {
-            result = chosen;
+        if (!roots.length)
             return true;
-        }
-        foreach (candidate; candidates(requirements[next]))
+        // Intern requirements before expansion so mutually dependent packages
+        // reach a fixed point rather than recursively expanding forever.
+        Dependency[] requests;
+        size_t[string] requestIds;
+        string key(Dependency dep)
         {
-            auto resolved = materialize(candidate.dependency, candidate.version_);
-            if (!accepts(resolved, requirements[next]))
-                continue;
-            auto newChosen = chosen.dup;
-            newChosen[next] = resolved;
-            auto newRequirements = requirements.dup;
-            foreach (dependency; resolved.children)
-                newRequirements[dependency.name] = newRequirements.get(dependency.name,
-                        null).dup ~ dependency;
-            if (solve(newRequirements, newChosen, result))
-                return true;
+            return hashParts([
+                dep.name, dep.source, dep.url, dep.constraint, dep.tag,
+                dep.revision, dep.branch, dep.checksum
+            ]);
         }
-        return false;
+
+        size_t intern(Dependency dep)
+        {
+            auto identity = key(dep);
+            if (auto found = identity in requestIds)
+                return *found;
+            auto index = requests.length;
+            requestIds[identity] = index;
+            requests ~= dep;
+            return index;
+        }
+
+        size_t[] rootIds;
+        foreach (dep; roots)
+            rootIds ~= intern(dep);
+        Resolved[] universe;
+        int[string] candidateIds;
+        int[][string] byName;
+        int[][] alternatives;
+        for (size_t index; index < requests.length; ++index)
+        {
+            auto dep = requests[index];
+            int[] options;
+            foreach (candidate; candidates([dep]))
+            {
+                auto resolved = materialize(candidate.dependency, candidate.version_);
+                if (!accepts(resolved, [dep]))
+                    continue;
+                auto entry = resolved.locked;
+                auto identity = hashParts([
+                    entry.name, entry.source, entry.url, entry.version_,
+                    entry.treeHash, entry.revision, entry.checksum
+                ]);
+                int id;
+                if (auto found = identity in candidateIds)
+                    id = *found;
+                else
+                {
+                    if (universe.length >= int.max)
+                        fail("E_PACKAGE", "too many package candidates");
+                    universe ~= resolved;
+                    id = cast(int) universe.length;
+                    candidateIds[identity] = id;
+                    byName[entry.name] ~= id;
+                    foreach (child; resolved.children)
+                        intern(child);
+                }
+                options ~= id;
+            }
+            alternatives ~= options;
+        }
+        int[][] clauses;
+        foreach (index; rootIds)
+            clauses ~= alternatives[index];
+        foreach (name; byName.keys.sort)
+        {
+            auto ids = byName[name];
+            foreach (i, left; ids)
+                foreach (right; ids[i + 1 .. $])
+                    clauses ~= [-left, -right];
+        }
+        int[] preferences;
+        foreach (i, candidate; universe)
+        {
+            auto id = cast(int) i + 1;
+            preferences ~= id;
+            foreach (child; candidate.children)
+                clauses ~= [-id] ~ alternatives[requestIds[key(child)]];
+        }
+        int[] selected;
+        if (!solveConstraints(clauses, preferences, selected))
+            return false;
+        Resolved[string] chosen;
+        foreach (id; selected)
+            chosen[universe[id - 1].locked.name] = universe[id - 1];
+        // SAT may also select an unrelated satisfiable component. Publish only
+        // the closure of the root requirements, once each even in a cycle.
+        string[] pending = roots.map!(dep => dep.name).array;
+        for (size_t i; i < pending.length; ++i)
+        {
+            auto name = pending[i];
+            if (name in result)
+                continue;
+            auto candidate = chosen[name];
+            result[name] = candidate;
+            pending ~= candidate.children.map!(dep => dep.name).array;
+        }
+        return true;
     }
 
     private Candidate[] candidates(Dependency[] requirements)

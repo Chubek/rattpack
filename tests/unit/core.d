@@ -65,6 +65,55 @@ private void expectCode(string code, void delegate() action)
     }
 }
 
+@("Satie suggests an ordering repair without changing build dependencies")
+unittest
+{
+    foreach (count; [1, 2, 4])
+    {
+        auto graph = new Graph(".");
+        foreach (i; 0 .. count)
+        {
+            auto action = new Action;
+            action.name = "cycle" ~ i.to!string;
+            action.outputs = ["out" ~ i.to!string];
+            action.inputs = ["out" ~ ((i + 1) % count).to!string];
+            graph.add(action);
+        }
+        try
+        {
+            graph.ordered();
+            assert(false, "expected a cycle");
+        }
+        catch (Diagnostic error)
+        {
+            error.code.shouldEqual("E_CYCLE");
+            assert(error.msg.canFind("Satie suggests reviewing dependency cycle" ~ (count - 1)
+                    .to!string ~ " -> cycle0"), error.msg);
+        }
+        graph.actions["cycle0"].inputs.shouldEqual([
+            "out" ~ (1 % count).to!string
+        ]);
+        graph.actions["cycle" ~ (count - 1).to!string].inputs = null;
+        graph.ordered().length.shouldEqual(count);
+    }
+}
+
+@("Satie resolves mutual selection, exclusion, and impossible requirements")
+unittest
+{
+    import rattpack.constraints : solveConstraints;
+
+    int[] selected;
+    assert(solveConstraints([[1, 2], [-1, 3], [-3, 1], [-1, -2]], [1, 2, 3], selected));
+    selected.shouldEqual([1, 3]);
+    assert(solveConstraints([[1, 2], [-1, 3], [-3, 1], [-1, -2], [-3]], [
+            1, 2, 3
+    ], selected));
+    selected.shouldEqual([2]);
+    assert(!solveConstraints([[1], [-1]], [1], selected));
+    assert(!solveConstraints([cast(int[])[]], null, selected));
+}
+
 @("tree walking: recursion, closures, short circuit, and mutation")
 unittest
 {

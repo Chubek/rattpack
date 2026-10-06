@@ -22,7 +22,7 @@ extensions, and troubleshooting.
 
 ## Build and test
 
-Prerequisites: DUB, LDC or DMD, a C compiler, CMake, OpenSSL development headers,
+Prerequisites: DUB, LDC or DMD, C and C++20 compilers, CMake, OpenSSL development headers,
 and Python 3 (3.11+ for integration tests). Native libraries
 are pinned Git submodules; D packages are pinned in `dub.selections.json`.
 
@@ -41,6 +41,10 @@ Applications can also be bootstrapped separately with `dub build -c rattsc` or
 `dub build -c ratt-language-server`. Set `DC` to choose the compiler for
 repository helpers.
 The bootstrap library links the pinned BLAKE3, libgit2, zlib, and xz sources.
+Satie's DependencySAT plugin is built into the separate `ratt-satie` helper for
+package constraint solving and build-cycle repair suggestions. See
+[dependency solving and directory-to-Rattpkg discovery](docs/dependency-solving.md)
+for details and usage of `tools/ls2rattpkg.py`.
 The self-hosted build uses the configured `toolchain.d`; set it to `dmd` when
 dogfooding a DMD bootstrap. Plugins must use the same compiler as their host.
 

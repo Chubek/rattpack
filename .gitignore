@@ -9,3 +9,6 @@
 /*.dylib
 /Rattpkg.lock
 **/__pycache__/
+.env
+.env.*
+!.env.example

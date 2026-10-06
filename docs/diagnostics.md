@@ -16,7 +16,7 @@ errors. `--warnings-as-errors` promotes warnings without changing their codes.
 | `E_IDENTITY_MISMATCH` | File naming and identity declaration disagree. Subordinates require both `Rattspec.m` and `module()`. | `e-identity.ratt` |
 | `E_SPEC` | Invalid/missing project metadata or no declared targets. Supply a root identity and at least one target. | `e-spec.ratt` |
 | `E_TARGET` | Invalid/duplicate target, conflicting output, missing source/compiler, or unresolved dependency. | `e-target.ratt` |
-| `E_CYCLE` | The build DAG contains a cycle. Remove the circular dependency. | `e-cycle.ratt` |
+| `E_CYCLE` | The build DAG contains a cycle. The message lists its edges and, for cycles of up to 128 actions, a Satie ordering-repair suggestion. Restructure the indicated dependency; required edges are never silently removed. | `e-cycle.ratt` |
 | `E_HERMETIC` | Strict execution found an undeclared input/output/tool, changed frozen input/tool, an isolation failure, or an unsandboxed action. | `e-hermetic.ratt` |
 | `E_ACTION` | A command failed, an output was not produced, or an action violated its write scope. | `e-action.ratt` |
 | `E_GRAPH` | Invalid graph format/version, inconsistent content identities, or exporter failure. Re-export the graph. | `e-graph.ratt` |

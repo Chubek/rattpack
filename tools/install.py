@@ -27,6 +27,7 @@ def installation_plan(build, with_plugins=False):
     plan = [(build / (app + suffix), Path("bin") / (app + suffix))
             for app in APPLICATIONS]
     plan.append((build / library, Path("bin") / library))
+    plan.append((build / ("ratt-satie" + suffix), Path("bin") / ("ratt-satie" + suffix)))
     if with_plugins:
         plan.extend((build / "plugins" / (name + plugin_suffix),
                      Path("bin/plugins") / (name + plugin_suffix)) for name in PLUGINS)

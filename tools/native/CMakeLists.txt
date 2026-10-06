@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(rattpack_native LANGUAGES C)
+project(rattpack_native LANGUAGES C CXX)
 get_filename_component(RATTPACK_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${RATTPACK_ROOT}/build")
@@ -52,3 +52,21 @@ target_include_directories(rattnative PRIVATE
   "${CMAKE_CURRENT_BINARY_DIR}/zlib"
   "${RATTPACK_ROOT}/third_party/xz/src/liblzma/api")
 add_dependencies(rattnative libgit2package liblzma zlibstatic)
+
+add_executable(ratt-satie satie.cpp
+  "${RATTPACK_ROOT}/third_party/satie/src/SatieMemory.cpp")
+find_package(Threads REQUIRED)
+target_link_libraries(ratt-satie PRIVATE Threads::Threads)
+target_compile_features(ratt-satie PRIVATE cxx_std_20)
+target_compile_definitions(ratt-satie PRIVATE SATIE_NO_LUA_PLUGIN)
+target_include_directories(ratt-satie PRIVATE
+  "${RATTPACK_ROOT}/third_party/satie/include"
+  "${RATTPACK_ROOT}/third_party/satie/third_party/memtkx/include"
+  "${RATTPACK_ROOT}/third_party/satie/stdplugin")
+set_target_properties(ratt-satie PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${RATTPACK_ROOT}/build")
+foreach(configuration DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+  set_target_properties(ratt-satie PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY_${configuration} "${RATTPACK_ROOT}/build")
+endforeach()
+add_dependencies(rattnative ratt-satie)

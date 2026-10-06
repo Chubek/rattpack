@@ -304,10 +304,19 @@ Rules for agents:
 | `xz`      | `.tar.xz` extraction                            | https://github.com/tukaani-project/xz        |
 | `blake3`  | Content hashing for DAG node identity           | https://github.com/BLAKE3-team/BLAKE3        |
 | `openaipp` | OpenAI API client for the `openai-assist` plugin only | vendored in tree; see §8 |
+| `satie` | SAT package selection and build-cycle repair suggestions, via the separate C++20 `ratt-satie` executable | https://github.com/Chubek/satie |
+| `memtkx` | Satie's allocator (nested under `third_party/satie/third_party/`) | vendored with Satie |
 
 `openaipp` is C++20 and is linked **only** into `plugins/openai-assist/`, through
 `plugins/openai-assist/bridge.cpp`. The shared runtime must not acquire a C++
 dependency: agents adding C++ to `librattpack` will be rejected in review.
+
+Satie is also C++20 and is compiled only into the standalone `ratt-satie`
+helper, installed beside the applications. The D runtime exchanges CNF clauses
+with it over pipes; it does not link Satie or the C++ runtime. Its native plugin
+host is built with `SATIE_NO_LUA_PLUGIN`, avoiding the optional QaMRpp frontend.
+The optional repository-discovery Python tools use `python-dotenv` and `ddgs`
+(DuckDuckGo backend); install their requirements from `tools/requirements.txt`.
 
 ### 11.3 Toolchain (not vendored)
 

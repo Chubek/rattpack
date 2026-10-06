@@ -13,18 +13,24 @@ let native = fs.glob("third_party/blake3/c/*") + fs.glob("third_party/libgit2/sr
   fs.glob("third_party/libgit2/include/**/*") + fs.glob("third_party/libgit2/cmake/*") +
   fs.glob("third_party/libgit2/deps/**/*") + fs.glob("third_party/zlib/*") +
   fs.glob("third_party/xz/src/**/*") + fs.glob("third_party/xz/cmake/*") +
-  ["third_party/libgit2/CMakeLists.txt", "third_party/xz/CMakeLists.txt"]
+  fs.glob("third_party/satie/include/*.hpp") +
+  fs.glob("third_party/satie/stdplugin/DependencySAT/*.hpp") +
+  fs.glob("third_party/satie/third_party/memtkx/include/**/*.hpp") +
+  ["third_party/satie/src/SatieMemory.cpp", "third_party/libgit2/CMakeLists.txt", "third_party/xz/CMakeLists.txt"]
 let runtime = rule(name: "librattpack", output: "build/" + toolchain.runtime_library,
   inputs: fs.glob("source/rattpack/**/*.d") + fs.glob("stdlib/*.ratt") +
-    ["runtime/dub.sdl", "dub.sdl", "dub.selections.json", "tools/dogfood.py", "tools/build-native.py", "tools/native/CMakeLists.txt", "source/rattpack/native/bridge.c"],
+    ["runtime/dub.sdl", "dub.sdl", "dub.selections.json", "tools/dogfood.py", "tools/build-native.py", "tools/native/CMakeLists.txt", "tools/native/satie.cpp", "source/rattpack/native/bridge.c"],
   raw_inputs: fs.glob("profiles/*.in") + fs.glob("templates/scaffold/*") + native,
   command: [python, "tools/dogfood.py", "--compiler", compiler.command, "library"],
   toolchain: compiler.fingerprint, sandbox: false)
+let solver = rule(name: "ratt-satie", output: "build/ratt-satie" + toolchain.executable_suffix,
+  deps: [runtime], inputs: ["tools/build-native.py"],
+  command: [python, "tools/build-native.py"], sandbox: false)
 for app in ["rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server"] {
   rule(name: "man-" + app, output: "build/man/man1/" + app + ".1",
     inputs: ["man/" + app + ".1", "tools/build-man.py"],
     command: [python, "tools/build-man.py", app + ".1"])
-  rule(name: app, output: "build/" + app + toolchain.executable_suffix, deps: [runtime],
+  rule(name: app, output: "build/" + app + toolchain.executable_suffix, deps: [runtime, solver],
     inputs: ["source/apps/" + app + "/main.d", "tools/dogfood.py"],
     command: [python, "tools/dogfood.py", "--compiler", compiler.command, "app", app], toolchain: compiler.fingerprint)
 }

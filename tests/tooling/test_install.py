@@ -22,7 +22,7 @@ class InstallationTests(unittest.TestCase):
         self.build = self.root / "build"
         self.build.mkdir()
         suffix, library, _ = installer.platform_names()
-        for name in [app + suffix for app in installer.APPLICATIONS] + [library]:
+        for name in [app + suffix for app in installer.APPLICATIONS] + [library, "ratt-satie" + suffix]:
             (self.build / name).write_bytes(b"new payload")
 
     @unittest.skipIf(os.name == "nt", "POSIX shell launcher")
@@ -59,6 +59,8 @@ class InstallationTests(unittest.TestCase):
         destination = self.root / "prefix with spaces"
         plan = installer.installation_plan(self.build)
         installer.install(plan, destination)
+        self.assertEqual((destination / "bin" / ("ratt-satie" + installer.platform_names()[0])).read_bytes(),
+                         b"new payload")
         (destination / "custom.conf").write_text("keep")
         for app in installer.APPLICATIONS:
             self.assertEqual((destination / "bin" / (app + installer.platform_names()[0])).read_bytes(), b"new payload")
