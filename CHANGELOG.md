@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve OpenCode's API error body alongside its HTTP status in `rattspec
+  assist` diagnostics, exposing model-selection and other request failures.
 - Use the vendored Satie DependencySAT plugin in a standalone C++20 helper for
   deterministic package constraint solving, compatible package cycles, and
   build-cycle ordering repair suggestions. Keep the shared runtime D-only.

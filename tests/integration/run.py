@@ -542,11 +542,12 @@ def test_distribution(work):
     check("installed CLIs, runtime and plugin work outside checkout; all eight scaffolds build")
 
 
-def assist_stub(work, response, log):
+def assist_stub(work, response, log, errors="", status=0):
     """A stub OpenCode V2 CLI: rattspec uses the CLI for IPC and auth."""
     script = work / ("fake opencode " + log.name)
     script.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > " + str(log) + "\ncat <<'RESPONSE'\n"
-                      + response + "\nRESPONSE\n")
+                      + response + "\nRESPONSE\ncat >&2 <<'ERRORS'\n"
+                      + errors + "\nERRORS\nexit " + str(status) + "\n")
     script.chmod(0o755)
     return script
 
@@ -596,6 +597,22 @@ def test_assist(work):
     run([BUILD / "rattspec", "assist", "again", "-C", project, "--opencode", "--opencode-executable", stub,
          "--no-standalone"])
     assert "--standalone" not in log.read_text().splitlines()
+
+    # The real CLI puts the JSON error body on stdout and the generic HTTP
+    # status on stderr. Both are needed to diagnose a rejected request.
+    before = {name: (project / name).read_text() for name in ("Rattspec", "Rattpkg")}
+    message = "No model specified and no supported model is available"
+    body = json.dumps({"_tag": "InvalidRequestError", "message": message})
+    for index, (output, errors, expected) in enumerate([
+            (body, "HTTP 400 Bad Request", [message, "HTTP 400 Bad Request"]),
+            (body, "", [message]),
+            ("", "Cannot connect to server", ["Cannot connect to server"])]):
+        failed = assist_stub(work, output, work / ("failed-%d.txt" % index), errors, 1)
+        diagnostic = run([BUILD / "rattspec", "assist", "x", "-C", project,
+                          "--opencode", "--opencode-executable", failed], ok=False).stdout
+        assert "E_ASSIST: OpenCode API exited with status 1:" in diagnostic, diagnostic
+        assert all(text in diagnostic for text in expected), diagnostic
+        assert {name: (project / name).read_text() for name in before} == before
 
     # A proposal the host cannot accept is never written.
     broken = assist_stub(work, json.dumps({"data": {"text": json.dumps(

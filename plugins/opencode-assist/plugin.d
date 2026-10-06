@@ -189,8 +189,16 @@ private string request(string[] command, string directory, int timeout, Location
         if (output.overflow || errors.overflow)
             fail("E_ASSIST", "OpenCode response exceeded the 4 MiB IPC limit", location);
         if (status)
-            fail("E_ASSIST", "OpenCode API exited with status " ~ status.to!string ~ ": " ~ (
-                    errors.text.length ? errors.text : output.text).strip, location);
+        {
+            // The CLI writes the HTTP status to stderr and the API error body
+            // to stdout. Keep both so the server's explanation is not lost.
+            auto details = errors.text.strip;
+            auto body = output.text.strip;
+            if (body.length)
+                details ~= (details.length ? "\n" : "") ~ body;
+            fail("E_ASSIST", "OpenCode API exited with status " ~ status.to!string
+                    ~ ": " ~ details, location);
+        }
         return output.text;
     }
     catch (Diagnostic diagnostic)

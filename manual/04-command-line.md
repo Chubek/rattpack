@@ -211,6 +211,18 @@ The two flags are mutually exclusive. Without either, the backend comes from
 the OpenAI backend takes a plain model name and uses `/chat/completions` by
 default, or `/responses` with `--openai-api responses`.
 
+The OpenCode one-shot generation API uses the server's base configuration to
+choose a model when `--model` is omitted. A model selected in an interactive
+session does not set this default. If assist reports `HTTP 400 Bad Request`
+with `No model specified and no supported model is available`, select an
+available model explicitly with `--model provider/model` (optionally
+`#variant`), or set `opencode.model` in `Rattpack.json` or the
+`RATTPACK_OPENCODE_MODEL` environment variable. List models with
+`opencode api get /api/model --standalone`. If none are available, connect a
+provider using `/connect` in OpenCode and check its configuration and
+credentials. API failures include both the CLI's HTTP status and the server's
+error body.
+
 ### Options
 
 | Option | Effect |
