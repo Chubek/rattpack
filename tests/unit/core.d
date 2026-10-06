@@ -24,6 +24,7 @@ import std.path;
 import std.random : uniform;
 import std.conv : to;
 import std.json;
+import std.algorithm : canFind;
 import std.string : replace, startsWith;
 
 private class Fixture
@@ -569,6 +570,130 @@ unittest
     expectCode("E_ASSIST", delegate{ applyAssistProposal(project, accepted); });
     readText(buildPath(fixture.root, "Rattpkg")).shouldEqual(
             "package(name: \"other\", version: \"2\")\n");
+}
+
+@("directory maps scan, serialise, memory-map and render terse text")
+unittest
+{
+    import rattpack.dirmap;
+    import rattpack.rt.map : mapFile;
+    import std.string : splitLines;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    fixture.put("src/main.c", "int main(void) { return 0; }\n");
+    fixture.put("src/core/util.h", "int f(void);\n");
+    fixture.put("README.md", "# demo\n");
+    mkdirRecurse(buildPath(fixture.root, ".git"));
+    atomicWrite(buildPath(fixture.root, ".git/config"), "ignored");
+    mkdirRecurse(buildPath(fixture.root, "build"));
+    atomicWrite(buildPath(fixture.root, "build/out.o"), "generated");
+    atomicWrite(buildPath(fixture.root, "src/main.c"), "int main(void) { return 1; }\n");
+
+    auto scanned = scanDirectory(fixture.root);
+    // Version control metadata and build output are never mapped.
+    string rendered = renderDirMap(scanned);
+    assert(!rendered.canFind(".git"), rendered);
+    assert(!rendered.canFind("out.o"), rendered);
+    // The root is node zero, children follow in preorder, and indentation
+    // carries depth without any end markers.
+    scanned.nodes[0].kind.shouldEqual(DirKind.directory);
+    scanned.nodes[0].depth.shouldEqual(0u);
+    assert(scanned.nodes.canFind!(n => n.name == "util.h"));
+    assert(rendered.splitLines.length == scanned.nodes.length);
+
+    auto path = buildPath(fixture.root, "map.bin");
+    writeDirMap(path, scanned);
+    auto mapped = MappedDirMap.open(path);
+    scope (exit)
+        mapped.close;
+    mapped.live.shouldBeTrue;
+    mapped.length.shouldEqual(scanned.nodes.length);
+    foreach (index, node; scanned.nodes)
+    {
+        auto round = mapped.node(index);
+        round.name.shouldEqual(node.name);
+        round.kind.shouldEqual(node.kind);
+        round.depth.shouldEqual(node.depth);
+        round.size.shouldEqual(node.size);
+        round.contentId.shouldEqual(node.contentId);
+        round.fileCount.shouldEqual(node.fileCount);
+    }
+    // Text from the mapping must be identical to text from the scan.
+    renderMappedDirMap(mapped).shouldEqual(rendered);
+    // Directory totals cover the whole subtree.
+    scanned.nodes[0].fileCount.shouldEqual(3u);
+    // Names containing the attribute separator are escaped in the text form.
+    auto odd = new Fixture;
+    scope (exit)
+        odd.close;
+    odd.put("a b:c.c", "x\n");
+    renderDirMap(scanDirectory(odd.root)).canFind("a\\ b\\:c.c").shouldBeTrue;
+    // A map that is not a map is rejected rather than misread.
+    expectCode("E_MAP", {
+        atomicWrite(buildPath(fixture.root, "bogus.bin"), "not a map at all, really");
+        MappedDirMap.open(buildPath(fixture.root, "bogus.bin"));
+    });
+    expectCode("E_MAP", { mapFile(buildPath(fixture.root, "absent.bin")); });
+}
+
+@("Rattpack.json resolves flags, environment, and configuration in order")
+unittest
+{
+    import rattpack.config.tool;
+    import std.process : environment;
+
+    auto fixture = new Fixture;
+    scope (exit)
+        fixture.close;
+    // A missing file yields defaults rather than an error.
+    loadToolConfig(buildPath(fixture.root, "empty")).backend
+        .shouldEqual(AssistBackend.opencode);
+    fixture.put("rattpack/Rattpack.json",
+            "{\"backend\":\"openai\","
+            ~ "\"openai\":{\"base_url\":\"http://localhost:8080/v1\","
+            ~ "\"api_key\":\"from-file\",\"model\":\"file-model\","
+            ~ "\"api\":\"responses\",\"timeout\":45},"
+            ~ "\"opencode\":{\"executable\":\"oc\",\"standalone\":false},"
+            ~ "\"map\":{\"summary\":false,\"max_entries\":5000},"
+            ~ "\"plugins\":{\"openai-assist\":\"p.so\"},"
+            ~ "\"scripts\":{\"scaffold\":\"s.ratt\"},"
+            ~ "\"commands\":{\"format\":\"clang-format\"}}");
+    auto config = loadToolConfig(buildPath(fixture.root, "rattpack"));
+    config.backend.shouldEqual(AssistBackend.openai);
+    config.openai.baseUrl.shouldEqual("http://localhost:8080/v1");
+    config.openai.api.shouldEqual("responses");
+    config.openai.timeout.shouldEqual(45u);
+    config.opencode.executable.shouldEqual("oc");
+    config.opencode.standalone.shouldBeFalse;
+    config.map.summary.shouldBeFalse;
+    config.map.maxEntries.shouldEqual(5000u);
+    config.plugins["openai-assist"].shouldEqual("p.so");
+    config.scripts["scaffold"].shouldEqual("s.ratt");
+    config.commands["format"].shouldEqual("clang-format");
+
+    // A flag wins, the environment beats the file, and a default loses.
+    resolveSetting("flag", ["RATTPACK_UNIT_MISSING"], "file", "fallback")
+        .shouldEqual("flag");
+    environment["RATTPACK_UNIT_SETTING"] = "env";
+    scope (exit)
+        environment.remove("RATTPACK_UNIT_SETTING");
+    resolveSetting("", ["RATTPACK_UNIT_SETTING"], "file", "fallback")
+        .shouldEqual("env");
+    resolveSetting("", ["RATTPACK_UNIT_MISSING"], "file", "fallback")
+        .shouldEqual("file");
+    resolveSetting("", ["RATTPACK_UNIT_MISSING"], "", "fallback")
+        .shouldEqual("fallback");
+    // An unparsable timeout must not silently disable the deadline.
+    resolveTimeout("", ["RATTPACK_UNIT_MISSING"], 90).shouldEqual(90u);
+    resolveTimeout("0", [], 90).shouldEqual(90u);
+    resolveTimeout("30", [], 90).shouldEqual(30u);
+    // Malformed configuration is a diagnostic.
+    fixture.put("bad/Rattpack.json", "{ not json");
+    expectCode("E_CONFIG", { loadToolConfig(buildPath(fixture.root, "bad")); });
+    fixture.put("bad/Rattpack.json", "{\"backend\": \"anthropic\"}");
+    expectCode("E_CONFIG", { loadToolConfig(buildPath(fixture.root, "bad")); });
 }
 
 @("action environment is explicit, frozen, hashed and round trips")

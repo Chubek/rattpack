@@ -20,6 +20,7 @@ Rattpack is implemented in **D** (DMD/LDC, `-preview=dip1000` clean) and exposes
 | `rattbuild`  | Evaluates `Rattspec`, constructs the build DAG, executes it or exports it via plugin. |
 | `rattpkg`    | Package manager. Reads `Rattpkg`, resolves and fetches dependencies, verifies them.   |
 | `rattsc`     | Standalone Rattscript interpreter / REPL / linter (`rattsc --lint`).                  |
+| `rattspec`   | Assists authoring `Rattspec`/`Rattpkg` via an AI backend; maps directories.          |
 | `librattpack`| Shared library consumed by all of the above and by plugins.                           |
 
 ---
@@ -37,16 +38,22 @@ rattpack/
 │   │   ├── script/          # Rattscript lexer, parser, AST, tree-walking evaluator
 │   │   ├── stdlib/          # Rattscript standard library (fs, proc, str, path, toolchain, …)
 │   │   ├── graph/           # Build DAG: nodes, edges, scheduler, hashing, incremental cache
-│   │   ├── spec/            # Rattspec / .m loader, project identity, monorepo resolution
+│   │   ├── spec/            # Rattspec / .m loader, project identity, monorepo resolution,
+│   │   │                    # assist.d validates and publishes assisted spec edits
+│   │   ├── dirmap.d         # Binary directory map + terse map DSL (memory-mapped)
 │   │   ├── pkg/             # Rattpkg manifest, resolver, fetchers (http/ftp/git), lockfile
 │   │   ├── plugin/          # Plugin ABI, loader, built-in exporters
 │   │   ├── rt/              # Platform backends: rt/win32, rt/macos, rt/posix
-│   │   └── config/          # XDG config, Config.toml / Config.yaml, profiles
+│   │   └── config/          # XDG config, Config.toml / Config.yaml, profiles,
+│   │                        # Rattpack.json tooling config
 │   └── apps/
 │       ├── rattbuild/
 │       ├── rattpkg/
-│       └── rattsc/
+│       ├── rattsc/
+│       ├── rattspec/
+│       └── ratt-language-server/
 ├── plugins/                 # First-party exporters: cmake/, gnumake/, ninja/, meson/
+│                            # plus assist plugins: opencode-assist/, openai-assist/
 ├── profiles/                # Default build profiles shipped to $XDG_CONFIG_HOME (*.in)
 ├── stdlib/                  # Rattscript-side stdlib sources (*.ratt), embedded at build
 ├── tests/
@@ -296,6 +303,11 @@ Rules for agents:
 | `zlib`    | Archive extraction, required by libgit2         | https://github.com/madler/zlib               |
 | `xz`      | `.tar.xz` extraction                            | https://github.com/tukaani-project/xz        |
 | `blake3`  | Content hashing for DAG node identity           | https://github.com/BLAKE3-team/BLAKE3        |
+| `openaipp` | OpenAI API client for the `openai-assist` plugin only | vendored in tree; see §8 |
+
+`openaipp` is C++20 and is linked **only** into `plugins/openai-assist/`, through
+`plugins/openai-assist/bridge.cpp`. The shared runtime must not acquire a C++
+dependency: agents adding C++ to `librattpack` will be rejected in review.
 
 ### 11.3 Toolchain (not vendored)
 

@@ -11,7 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 APPLICATIONS = ("rattbuild", "rattpkg", "rattsc", "rattspec", "ratt-language-server")
-PLUGINS = ("cmake", "gnumake", "ninja", "meson", "opencode-assist")
+PLUGINS = ("cmake", "gnumake", "ninja", "meson", "opencode-assist", "openai-assist")
 
 
 def platform_names():

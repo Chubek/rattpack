@@ -212,6 +212,13 @@ private void diagnosticScenario(string source, string file, void delegate(string
     case "cli":
         validateBuildCommand("unknown-command");
         break;
+    case "map":
+        import rattpack.dirmap;
+        import rattpack.rt.map : mapFile;
+
+        // The source is a relative path that cannot be a directory.
+        scanDirectory(source[source.indexOf('\n') + 1 .. $].strip);
+        break;
     case "assist":
         import rattpack.spec.assist : AssistProject, decodeAssistProposal;
 

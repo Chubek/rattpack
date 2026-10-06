@@ -1,5 +1,9 @@
 module rattpack.rt.posix.sys;
 
+// Provided by the always-linked native bridge; selects the correct strerror_r
+// variant for this toolchain.
+extern (C) void ratt_describe_errno(int code, char* message, size_t capacity);
+
 version (Posix)
 {
     version (OSX)
@@ -11,6 +15,12 @@ version (Posix)
         import std.process : environment;
         import std.path : buildPath;
         import core.sys.posix.dlfcn;
+        import core.sys.posix.sys.mman;
+        import core.sys.posix.sys.uio;
+        import core.sys.posix.fcntl;
+        import core.sys.posix.unistd;
+        import core.stdc.stdio : SEEK_END, snprintf;
+        import core.stdc.errno : errno;
         import std.string : toStringz, fromStringz, startsWith;
         import std.parallelism : totalCPUs;
 
@@ -103,6 +113,56 @@ version (Posix)
         {
             auto error = dlerror();
             return error is null ? "unknown loader error" : error.fromStringz.idup;
+        }
+
+        private void describeErrno(char* error, size_t errorSize,
+                const(char)* label) @trusted
+        {
+            char[256] reason;
+            ratt_describe_errno(errno, reason.ptr, reason.length);
+            snprintf(error, errorSize, "%s: %s", label, reason.ptr);
+        }
+
+        bool mapRegion(string path, bool writable, out void* address, out size_t extent,
+                out void* backing, char* error, size_t errorSize) @trusted
+        {
+            address = null;
+            extent = 0;
+            backing = null;
+            auto descriptor = open(toStringz(path), writable ? O_RDWR : O_RDONLY, 0);
+            if (descriptor < 0)
+            {
+                describeErrno(error, errorSize, "cannot open");
+                return false;
+            }
+            scope (exit)
+                close(descriptor);
+            auto size = lseek(descriptor, 0, SEEK_END);
+            if (size < 0)
+            {
+                describeErrno(error, errorSize, "cannot size");
+                return false;
+            }
+            extent = cast(size_t) size;
+            // An empty file cannot be mapped; represent it as an empty view.
+            if (extent == 0)
+                return true;
+            int protection = PROT_READ | (writable ? PROT_WRITE : 0);
+            auto mapped = mmap(null, extent, protection, MAP_PRIVATE, descriptor, 0);
+            if (mapped == MAP_FAILED)
+            {
+                describeErrno(error, errorSize, "cannot map");
+                extent = 0;
+                return false;
+            }
+            address = mapped;
+            return true;
+        }
+
+        void unmapRegion(void* address, void* backing, size_t extent) @trusted
+        {
+            if (address !is null && extent)
+                munmap(address, extent);
         }
 
         ProcessResult runHermetic(string[] argv, string cwd, string[] writable,

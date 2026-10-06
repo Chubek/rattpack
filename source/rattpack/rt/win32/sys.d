@@ -136,6 +136,75 @@ version (Windows)
         return "Win32 loader error " ~ GetLastError().to!string;
     }
 
+    bool mapRegion(string path, bool writable, out void* address, out size_t extent,
+            out void* backing, char* error, size_t errorSize) @trusted
+    {
+        import core.sys.windows.windows;
+        import std.utf : toUTF16z;
+        import std.conv : to;
+        import core.stdc.stdio : snprintf;
+
+        address = null;
+        extent = 0;
+        backing = null;
+        DWORD access = writable ? (GENERIC_READ | GENERIC_WRITE) : GENERIC_READ;
+        auto handle = CreateFileW(path.toUTF16z, access,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, null,
+                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
+        if (handle == INVALID_HANDLE_VALUE)
+        {
+            snprintf(error, errorSize, "cannot open: error %d",
+                    cast(int) GetLastError());
+            return false;
+        }
+        scope (exit)
+            CloseHandle(handle);
+        LARGE_INTEGER size;
+        if (!GetFileSizeEx(handle, &size) || size.QuadPart < 0)
+        {
+            snprintf(error, errorSize, "cannot size: error %d",
+                    cast(int) GetLastError());
+            return false;
+        }
+        extent = cast(size_t) size.QuadPart;
+        // An empty file has no section object; represent it as an empty view.
+        if (extent == 0)
+            return true;
+        DWORD protection = writable ? (PAGE_READWRITE) : PAGE_READONLY;
+        auto mapping = CreateFileMappingW(handle, null, protection, 0, 0, null);
+        if (mapping is null)
+        {
+            snprintf(error, errorSize, "cannot create mapping: error %d",
+                    cast(int) GetLastError());
+            extent = 0;
+            return false;
+        }
+        DWORD viewAccess = writable ? FILE_MAP_WRITE : FILE_MAP_READ;
+        auto view = MapViewOfFile(mapping, viewAccess, 0, 0, extent);
+        if (view is null)
+        {
+            snprintf(error, errorSize, "cannot map view: error %d",
+                    cast(int) GetLastError());
+            CloseHandle(mapping);
+            extent = 0;
+            return false;
+        }
+        address = view;
+        // Win32 requires the section to stay open until its view is released.
+        backing = cast(void*) mapping;
+        return true;
+    }
+
+    void unmapRegion(void* address, void* backing, size_t extent) @trusted
+    {
+        import core.sys.windows.windows;
+
+        if (address !is null && extent)
+            UnmapViewOfFile(address);
+        if (backing !is null)
+            CloseHandle(cast(HANDLE) backing);
+    }
+
     ProcessResult runHermetic(string[] argv, string cwd, string[] writable,
             string temporary, string[] readable, string[string] env)
     {

@@ -18,6 +18,20 @@
   creates and updates `Rattspec` and `Rattpkg` through OpenCode V2's HTTP API,
   with model selection, timeouts, host-side validation before writing, and the
   new `E_ASSIST` diagnostic.
+- Add the `openai-assist` plugin and `rattspec assist --openai`, reaching any
+  OpenAI-compatible server through the vendored `third_party/openaipp` client.
+  The C++20 bridge is linked only into that plugin, so the shared runtime does
+  not require a C++ toolchain. Supports bearer keys and HTTP basic credentials
+  across both `/chat/completions` and `/responses`.
+- Launch OpenCode with `--standalone` for assist, so a request never waits on or
+  is redirected by the shared background service.
+- Add `Rattpack.json` tooling configuration under the configuration directory,
+  resolving backend, endpoint, credential, plugin, script, and command settings
+  from command-line flags, then the environment, then the file.
+- Add memory-mapped file support to the platform backends and a directory map
+  module: `rattspec map DIRECTORY` caches a binary map under
+  `.cache/rattpack/<directoryname>.bin` and can print a terse map DSL that
+  `assist` attaches to requests. Adds the `E_MAP` diagnostic.
 
 ## 0.1.0 — 2026-10-02
 

@@ -69,27 +69,53 @@ struct PackageOptions
     @NamedArgument("version") bool version_;
 }
 
-/// Options accepted by the assisted specification editor.
-@(Command("rattspec").Description("Create and update Rattspec and Rattpkg through OpenCode.")
-        .Epilog("Example: rattspec assist 'add these libraries: fmt and zlib'"))
+/// Options accepted by the assisted specification editor and directory mapper.
+@(Command("rattspec").Description("Create or update Rattpack specifications through an AI"
+        ~ " backend, and map directories into a terse inventory.")
+        .Epilog("Examples: rattspec assist 'add these libraries: fmt and zlib';"
+            ~ " rattspec map . --print"))
 struct SpecOptions
 {
-    /// Assist command and natural-language request.
+    /// Subcommand, request text, or the directory to map.
     @(PositionalArgument.Optional) string[] positional;
     /// Project root directory.
     @NamedArgument("C", "directory") string directory = ".";
-    /// Native assist plugin; defaults to plugins/opencode-assist beside the CLI.
+    /// Assist through OpenCode V2.
+    @NamedArgument("opencode") bool useOpenCode;
+    /// Assist through an OpenAI-compatible server.
+    @NamedArgument("openai") bool useOpenAi;
+    /// Assist plugin override; defaults to the backend's plugin beside the CLI.
     @NamedArgument("plugin") string plugin;
     /// OpenCode executable name or path.
-    @NamedArgument("opencode") string opencode = "opencode";
+    @NamedArgument("opencode-executable") string opencodeExecutable;
     /// Explicit OpenCode server, using the CLI's authentication context.
     @NamedArgument("server") string server;
-    /// Optional provider/model#variant; otherwise use OpenCode's default model.
+    /// Run OpenCode with a private server instead of the shared service.
+    @(NamedArgument("standalone").Description("Use a private OpenCode server (default on)"))
+    bool standalone = true;
+    /// OpenAI-compatible base URL.
+    @NamedArgument("openai-url") string openaiUrl;
+    /// OpenAI API key.
+    @NamedArgument("openai-key") string openaiKey;
+    /// OpenAI basic-auth user.
+    @NamedArgument("openai-user") string openaiUser;
+    /// OpenAI basic-auth password.
+    @NamedArgument("openai-password") string openaiPassword;
+    /// OpenAI endpoint family: chat or responses.
+    @NamedArgument("openai-api") string openaiApi;
+    /// Model: OpenCode provider/model#variant, or an OpenAI model name.
     @NamedArgument("model") string model;
-    /// IPC deadline in seconds.
-    @NamedArgument("timeout") uint timeout = 120;
+    /// Request deadline in seconds.
+    @NamedArgument("timeout") uint timeout;
     /// Generate and validate a proposal, printing JSON instead of writing files.
     @NamedArgument("dry-run") bool dryRun;
+    /// Directory map cache location; defaults to $XDG_CACHE_HOME/rattpack.
+    @NamedArgument("map-out") string mapOut;
+    /// Include directory totals in rendered map text.
+    @(NamedArgument("summary").Description("Include directory file and byte totals (default on)"))
+    bool summary = true;
+    /// Print rendered map text after writing the binary map.
+    @NamedArgument("print") bool printMap;
     /// Print the version and exit.
     @NamedArgument("version") bool version_;
 }

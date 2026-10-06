@@ -15,7 +15,8 @@ extensions, and troubleshooting.
 - **`rattsc`** runs Rattscript, checks optional annotations, runs golden tests,
   and provides a REPL.
 - **`rattspec`** creates and updates `Rattspec` and `Rattpkg` from a
-  natural-language request using the `opencode-assist` plugin.
+  natural-language request through OpenCode or any OpenAI-compatible server,
+  and maps directories into a terse inventory.
 - **`ratt-language-server`** provides static editor diagnostics, completion,
   hover, definitions, and document symbols over LSP.
 
@@ -193,20 +194,45 @@ them itself. See the [registry protocol](docs/registry.md).
 
 ## Assisted specification editing
 
-`rattspec assist` writes `Rattspec` and `Rattpkg` from a natural-language request
-using OpenCode V2, through its own CLI so discovery and authentication apply:
+`rattspec assist` writes `Rattspec` and `Rattpkg` from a natural-language request.
+Select the backend explicitly, or set a default in `Rattpack.json`:
 
 ```sh
-rattspec assist 'add these libraries: fmt and zlib'
+rattspec assist 'add these libraries: fmt and zlib' --opencode
+rattspec assist 'build a C library and an exe that links it' --openai \
+    --openai-url http://127.0.0.1:8000/v1 --openai-user builder --model my-model
 rattspec assist 'turn this into a monorepo' --dry-run
 ```
 
-The plugin sends the existing files plus a bounded source inventory to
-`POST /api/experimental/generate`. Proposals are parsed, linted, and checked
-against the real manifest reader before anything is written, and files edited
-during generation are never overwritten. Model output is not executed. Use
-`--model provider/model#variant`, `--server URL`, and `--timeout` to control the
-request. See [command-line reference](manual/04-command-line.md).
+`--opencode` goes through OpenCode V2's own CLI, so its discovery and
+authentication apply. `--openai` reaches any OpenAI-compatible server via the
+vendored openaipp client, with a bearer key or basic credentials.
+
+Proposals are parsed, linted, and checked against the real manifest reader before
+anything is written, and files edited during generation are never overwritten.
+Model output is not executed.
+
+## Directory maps
+
+`rattspec map` records a directory as a compact binary map in
+`.cache/rattpack/<directoryname>.bin`, which `assist` attaches to requests so a
+large project is described by one short inventory. The text form is terse by
+design:
+
+```text
+d demo:F6:B273.5k
+ f README.md:7:b21109ab
+ f run.sh:X:10:bc1f407a
+ d src:F4:B273.5k
+  f main.c:22:0b377551
+```
+
+```sh
+rattspec map . --print
+```
+
+See the [command-line reference](manual/04-command-line.md) and
+`man/rattspec.1`.
 
 ## Rattscript
 

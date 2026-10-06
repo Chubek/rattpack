@@ -513,28 +513,36 @@ def test_assist(work):
     project = work / "assist project"
     put(project, "main.c", "int main(void) { return 0; }\n")
     preview = run([BUILD / "rattspec", "assist", "add fmt and an executable", "-C",
-                   project, "--opencode", stub, "--dry-run"]).stdout
+                   project, "--opencode", "--opencode-executable", stub, "--dry-run"]).stdout
     assert '"Rattspec"' in preview and not (project / "Rattspec").exists()
     argv = log.read_text().splitlines()
     assert argv[0] == "api" and argv[1] == "post"
     assert argv[2] == "/api/experimental/generate"
     assert json.loads(argv[4])["prompt"].endswith('"add fmt and an executable"}')
 
-    run([BUILD / "rattspec", "assist", "add fmt and an executable", "-C", project, "--opencode", stub])
+    run([BUILD / "rattspec", "assist", "add fmt and an executable", "-C", project,
+         "--opencode", "--opencode-executable", stub])
     assert "Added a C executable and pinned fmt." in run(
         [BUILD / "rattspec", "assist", "add fmt and an executable", "-C", project,
-         "--opencode", stub]).stdout
+         "--opencode", "--opencode-executable", stub]).stdout
     assert not (project / "Rattpkg.lock").exists()
     run([BUILD / "rattbuild", "build", "--warnings-as-errors", "-C", project])
     assert (project / "build/demo").exists()
 
-    # The model reference and explicit server reach the CLI unchanged.
-    run([BUILD / "rattspec", "assist", "again", "-C", project, "--opencode", stub,
+    # The model reference and explicit server reach the CLI unchanged, and the
+    # request runs on a private OpenCode server by default.
+    run([BUILD / "rattspec", "assist", "again", "-C", project, "--opencode", "--opencode-executable", stub,
          "--model", "opencode-go/space-bunny-free#free", "--server", "http://127.0.0.1:4096"])
     argv = log.read_text().splitlines()
     assert json.loads(argv[4])["model"] == {"providerID": "opencode-go",
                                             "id": "space-bunny-free", "variant": "free"}
-    assert argv[-2:] == ["--server", "http://127.0.0.1:4096"]
+    joined = argv
+    server = joined.index("--server")
+    assert joined[server + 1] == "http://127.0.0.1:4096", joined
+    assert "--standalone" in joined
+    run([BUILD / "rattspec", "assist", "again", "-C", project, "--opencode", "--opencode-executable", stub,
+         "--no-standalone"])
+    assert "--standalone" not in log.read_text().splitlines()
 
     # A proposal the host cannot accept is never written.
     broken = assist_stub(work, json.dumps({"data": {"text": json.dumps(
@@ -543,11 +551,119 @@ def test_assist(work):
          "summary": "unpinned"})}}), work / "broken.txt")
     before = (project / "Rattpkg").read_text()
     assert "E_ASSIST" in run([BUILD / "rattspec", "assist", "x", "-C", project,
-                              "--opencode", broken], ok=False).stdout
+                              "--opencode", "--opencode-executable", broken], ok=False).stdout
     assert (project / "Rattpkg").read_text() == before
     assert "E_ASSIST" in run([BUILD / "rattspec", "assist", "x", "-C", project,
-                              "--opencode", str(work / "missing opencode")], ok=False).stdout
-    check("rattspec assist drives OpenCode IPC, publishes validated files, and fails closed")
+                              "--opencode", "--opencode-executable", str(work / "missing opencode")], ok=False).stdout
+    check("rattspec assist drives OpenCode IPC on a private server, publishes validated files, and fails closed")
+
+
+def test_map_and_openai(work):
+    tree = work / "mapped tree"
+    put(tree, "main.c", "int main(void) { return 0; }\n")
+    put(tree, "src/util.c", "int f(void) { return 1; }\n")
+    put(tree, "src/util.h", "int f(void);\n")
+    put(tree, ".git/config", "ignored\n")
+    put(tree, "build/out.o", "generated\n")
+    put(tree, "run.sh", "#!/bin/sh\n")
+    (tree / "run.sh").chmod(0o755)
+    cache = Path(environment["XDG_CACHE_HOME"]) / "rattpack" / "mapped tree.bin"
+    result = run([BUILD / "rattspec", "map", tree, "--print"]).stdout
+    assert cache.is_file(), result
+    text = result.splitlines()
+    # Version control metadata and build output are never mapped.
+    assert not any(".git" in line or "out.o" in line for line in text), result
+    assert any(line.strip().startswith("f run.sh") and ":X:" in line for line in text), result
+    assert any(line.strip().startswith("d src:") for line in text), result
+    # The map attaches to assist prompts, so a second scan must be byte-identical.
+    again = run([BUILD / "rattspec", "map", tree, "--print"]).stdout
+    assert again == result
+    # A missing directory is a diagnostic, not a crash.
+    assert "E_MAP" in run([BUILD / "rattspec", "map", work / "absent"], ok=False).stdout
+
+    # Any OpenAI-compatible server: a stub answers both endpoint families.
+    seen = work / "openai-seen.json"
+
+    class OpenAiHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *_):
+            pass
+
+        def do_POST(self):
+            payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen.write_text(json.dumps({"path": self.path, "auth": self.headers.get("Authorization"),
+                                        "body": payload}))
+            files = {"Rattspec": "project(name: \"ai demo\", version: \"1.0.0\", kind: \"single\")\n"
+                                 "import \"target\"\n"
+                                 "target.executable(name: \"demo\", language: \"c\", sources: [\"main.c\"])\n",
+                     "Rattpkg": "package(name: \"ai-demo\", version: \"1.0.0\")\n"}
+            text = json.dumps({"files": files, "summary": "stubbed"})
+            if "input" in payload:
+                reply = json.dumps({"output_text": text})
+            else:
+                reply = json.dumps({"choices": [{"message": {"content": text}}]})
+            data = reply.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    class OpenAiServer(socketserver.ThreadingTCPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+
+    server = OpenAiServer(("127.0.0.1", 0), OpenAiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = "http://127.0.0.1:%d/v1" % server.server_address[1]
+        project = work / "ai project"
+        put(project, "main.c", "int main(void) { return 0; }\n")
+        run([BUILD / "rattspec", "map", project])
+        # A bearer key and the chat endpoint family.
+        run([BUILD / "rattspec", "assist", "add a target", "-C", project, "--openai",
+             "--openai-url", url, "--openai-key", "sk-test", "--model", "stub-model"])
+        request = json.loads(seen.read_text())
+        assert request["path"] == "/v1/chat/completions", request
+        assert request["auth"] == "Bearer sk-test", request
+        assert request["body"]["model"] == "stub-model", request
+        assert "Project map" in request["body"]["messages"][0]["content"], request
+        run([BUILD / "rattbuild", "build", "--warnings-as-errors", "-C", project])
+        assert (project / "build/demo").exists()
+        # Basic credentials take precedence over the key.
+        run([BUILD / "rattspec", "assist", "again", "-C", project, "--openai",
+             "--openai-url", url, "--openai-user", "alice", "--openai-password", "s3cret",
+             "--model", "stub-model", "--dry-run"])
+        request = json.loads(seen.read_text())
+        assert request["auth"] == "Basic YWxpY2U6czNjcmV0", request
+        # The responses endpoint family and a config-driven backend.
+        run([BUILD / "rattspec", "assist", "again", "-C", project, "--openai",
+             "--openai-url", url, "--openai-key", "sk-test", "--model", "stub-model",
+             "--openai-api", "responses", "--dry-run"])
+        assert json.loads(seen.read_text())["path"] == "/v1/responses"
+        config = Path(environment["XDG_CONFIG_HOME"]) / "rattpack"
+        config.mkdir(parents=True, exist_ok=True)
+        (config / "Rattpack.json").write_text(json.dumps({
+            "backend": "openai",
+            "openai": {"base_url": url, "api_key": "sk-config", "model": "config-model"}}))
+        environment.pop("OPENAI_API_KEY", None)
+        environment.pop("OPENAI_BASE", None)
+        environment.pop("OPENAI_MODEL", None)
+        run([BUILD / "rattspec", "assist", "from config", "-C", project, "--dry-run"])
+        request = json.loads(seen.read_text())
+        assert request["auth"] == "Bearer sk-config", request
+        assert request["body"]["model"] == "config-model", request
+        (config / "Rattpack.json").unlink()
+        # Missing credentials are rejected before any request is made.
+        assert "E_ASSIST" in run([BUILD / "rattspec", "assist", "x", "-C", project, "--openai",
+                                  "--openai-url", url, "--model", "stub-model",
+                                  "--dry-run"], ok=False).stdout
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+    check("rattspec map caches and renders a terse directory map reused by assist prompts")
+    check("rattspec assist --openai drives both OpenAI endpoint families and credential modes")
 
 
 def test_parallel_and_hermetic(work):
@@ -645,6 +761,7 @@ def main():
         test_profiles_and_identity(work)
         test_distribution(work)
         test_assist(work)
+        test_map_and_openai(work)
         test_parallel_and_hermetic(work)
         test_packages(work)
     print(f"{count} integration scenarios passed")

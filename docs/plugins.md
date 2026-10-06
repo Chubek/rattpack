@@ -33,9 +33,23 @@ evolution is append-only: append fields and bump `minor`, never reorder or remov
 existing fields. Keep the plugin loaded while any callback or registered native
 function can still be referenced.
 
-`plugins/opencode-assist/` is a stdlib plugin registering an `opencode` module
-with one effectful `generate` function. It is loaded by `rattspec assist` (see
-the manual, chapter 4) rather than by a build graph: the plugin speaks to
-OpenCode V2 over the `opencode api` CLI, so the CLI's service discovery and
-authentication apply, and marks the function effectful so it cannot be reached
-during graph construction.
+`plugins/opencode-assist/` and `plugins/openai-assist/` are stdlib plugins
+registering an `opencode` or `openai` module with one effectful `generate`
+function. They are loaded by `rattspec assist` (see the manual, chapter 4) rather
+than by a build graph, and mark their function effectful so graph construction
+cannot reach it.
+
+`opencode-assist` speaks to OpenCode V2 through the `opencode api` CLI, so that
+CLI's service discovery and authentication apply. `openai-assist` reaches any
+OpenAI-compatible server through the vendored `third_party/openaipp` client,
+using a small C ABI shim (`plugins/openai-assist/bridge.cpp`). Because that
+shim is C++20, it is compiled and linked into that plugin alone; the shared
+runtime does not require a C++ toolchain. Build both with:
+
+```sh
+DC=ldc2 python3 tools/dogfood.py plugins
+```
+
+openaipp models bearer-token authentication only, so the shim applies HTTP basic
+credentials to the same cpp-httplib client it already uses. URL parsing, header
+construction, and both endpoint calls remain inside openaipp.

@@ -37,7 +37,7 @@ private void registerModules(Evaluator evaluator)
             fail("E_ASSIST",
                 "OpenCode executable not found: " ~ executable ~ "; install OpenCode V2 or use --opencode PATH",
                 location);
-        auto timeout = args.get("timeout", 4, Value(120)).integer(location);
+        auto timeout = args.get("timeout", 5, Value(120)).integer(location);
         if (timeout <= 0 || timeout > int.max)
             fail("E_CLI", "OpenCode timeout must be a positive number of seconds", location);
         auto body = jsonObject();
@@ -52,6 +52,10 @@ private void registerModules(Evaluator evaluator)
         auto server = args.get("server", 2, Value("")).text(location);
         if (server.length)
             command ~= ["--server", server];
+        // A private server keeps assist independent of the shared background
+        // service, so a busy or redirected session cannot affect this request.
+        if (args.get("standalone", 4, Value(true)).truth)
+            command ~= "--standalone";
         string output;
         if (evaluator.processRunner !is null)
         {

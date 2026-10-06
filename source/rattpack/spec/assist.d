@@ -30,7 +30,9 @@ struct AssistProject
     AssistFile[string] files;
     string[] inventory;
 
-    string prompt(string request) @safe
+    /// Build the model prompt: fixed instructions, optional terse directory
+    /// map, and the current files plus a bounded path inventory.
+    string prompt(string request, string mapText = "") @safe
     {
         auto context = jsonObject();
         context["request"] = JSONValue(request);
@@ -40,7 +42,8 @@ struct AssistProject
         foreach (name; filenames)
             existing[name] = files[name].present ? JSONValue(files[name].contents) : JSONValue(null);
         context["existing_files"] = existing;
-        return instructions ~ "\nProject context (JSON):\n" ~ canonical(context);
+        return instructions ~ (mapText.length ? mapText : "")
+                ~ "\nProject context (JSON):\n" ~ canonical(context);
     }
 }
 

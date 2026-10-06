@@ -73,3 +73,23 @@ int ratt_decompress(const unsigned char *input, size_t input_size, int xz,
 }
 
 void ratt_native_free(void *pointer) { free(pointer); }
+
+/* Describe an errno value portably. The XSI and GNU strerror_r variants return
+   different types, so the choice is made here rather than in every backend. */
+void ratt_describe_errno(int code, char *message, size_t capacity)
+{
+    char buffer[256];
+    const char *text;
+    buffer[0] = '\0';
+#if defined(_GNU_SOURCE) && !defined(__APPLE__)
+    text = strerror_r(code, buffer, sizeof buffer);
+    if (text == NULL) { snprintf(message, capacity, "errno %d", code); return; }
+#else
+    if (strerror_r(code, buffer, sizeof buffer) != 0) {
+        snprintf(message, capacity, "errno %d", code);
+        return;
+    }
+    text = buffer;
+#endif
+    snprintf(message, capacity, "%s", text);
+}

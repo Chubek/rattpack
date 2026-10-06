@@ -1,65 +1,305 @@
 .TH RATTSPEC 1 "2026-10-05" "Rattpack 0.1.0" "User Commands"
 .SH NAME
-rattspec \- create or update Rattpack specifications using OpenCode
+rattspec \- create or update Rattpack specifications through an AI backend, and
+map directories into a terse inventory
 .SH SYNOPSIS
 .B rattspec assist
 .I REQUEST
 .RI [ OPTIONS ]
+.br
+.B rattspec map
+.I DIRECTORY
+.RI [ OPTIONS ]
+.br
+.B rattspec
+.RB { --opencode | --openai }
 .SH DESCRIPTION
 .B rattspec assist
-creates or updates the root Rattspec and Rattpkg files from a natural-language
-request. Quote REQUEST when it contains spaces or shell metacharacters.
-It requires OpenCode V2 and the matching opencode-assist native plugin.
+creates or updates the root
+.B Rattspec
+and
+.B Rattpkg
+files from a natural-language request. Quote REQUEST when it contains spaces or
+shell metacharacters. Select a backend with
+.B \-\-opencode
+or
+.BR \-\-openai ;
+without either, the backend comes from the configuration file.
 .PP
-The command reads existing root files and a bounded inventory of source paths,
-sends them through the opencode api CLI to OpenCode's experimental generation
-endpoint, and accepts complete replacement files in a JSON proposal.
-Unchanged files can be omitted; missing root files must be created.
+The command reads existing root files, plus a terse directory map when one has
+been cached, and sends them to the selected backend. It accepts complete
+replacement files in a JSON proposal. Unchanged files can be omitted; missing
+root files must be created.
 .PP
 Before writing, the whole proposal must parse and lint, declare exactly one
-project/package identity, and include at least one target in Rattspec.
-The real package manifest reader validates dependency sources, pins, and
-checksums. Generated Rattscript is never evaluated. Files are published
-atomically only if their existing contents still match the initial read.
+project/package identity, and include at least one target in Rattspec. The real
+package manifest reader validates dependency sources, pins, and checksums.
+Generated Rattscript is never evaluated. Files are published atomically only if
+their existing contents still match the initial read.
 .PP
-The command does not resolve dependencies or write Rattpkg.lock. Follow-up
-steps may appear in the generated summary.
+The command does not resolve dependencies or write Rattpkg.lock. Follow-up steps
+may appear in the generated summary.
+.PP
+.B rattspec map
+scans a directory and writes a compact binary map to
+.IR $XDG_CACHE_HOME/rattpack/<directoryname>.bin .
+The same map is attached to assist requests, so a large project is described by
+one short inventory instead of a long path list. With
+.B \-\-print
+the map is also written as the terse text described in MAP DSL below.
+.SH BACKENDS
+.TP
+.B \-\-opencode
+Use OpenCode V2 through the
+.B opencode api
+command, which applies that CLI's service discovery and authentication. The
+request is issued with
+.B \-\-standalone
+so it never waits on or is redirected by the shared background service. Pass
+.B \-\-no\-standalone
+to share the service instead.
+.TP
+.B \-\-openai
+Use any server speaking the OpenAI API, via the vendored openaipp client.
+Credentials may be a bearer API key or HTTP basic user and password; when a user
+is given it takes precedence over the key. Both
+.B /chat/completions
+and
+.B /responses
+are supported.
+.PP
+The two flags are mutually exclusive.
 .SH OPTIONS
 .TP
 .BI \-C " DIRECTORY" ", \--directory=" DIRECTORY
-Project directory. Default: current directory.
+Project directory for
+.BR assist ,
+and the default directory for
+.BR map .
+Default: current directory.
 .TP
-.BI \--plugin= PATH
-Assist plugin library. Default: plugins/opencode-assist with the platform's
-shared-library suffix, beside the rattspec executable. The plugin must match
-the host's D compiler family/major and shared runtime.
+.BI \-\-plugin= PATH
+Assist plugin library. Default: the backend's plugin, named
+.B opencode-assist
+or
+.BR openai-assist ,
+in
+.I plugins/
+beside the rattspec executable, with the platform's shared-library suffix.
+The plugin must match the host's D compiler family/major and shared runtime.
 .TP
-.BI \--opencode= EXECUTABLE
+.BI \-\-opencode\-executable= EXECUTABLE
 OpenCode executable name or path. Default: opencode, found using PATH.
 .TP
-.BI \--server= URL
-Explicit OpenCode server URL. By default, use the CLI's discovery and
+.BI \-\-server= URL
+Explicit OpenCode server. By default, use the CLI's discovery and
 authentication.
 .TP
-.BI \--model= MODEL
-Select provider/model or provider/model#variant.
-Default: OpenCode's configured model.
+.BR \-\-standalone ", " \-\-no\-standalone
+Run OpenCode with a private server. Default: enabled.
 .TP
-.BI \--timeout= SECONDS
-IPC deadline. Default: 120 seconds. Must be a positive integer no larger than
-2147483647.
+.BI \-\-openai\-url= URL
+OpenAI-compatible base URL, including any path prefix such as
+.IR /v1 .
 .TP
-.B \--dry-run
-Generate and validate the proposal, print it as JSON, and write no files.
-The OpenCode request still runs.
+.BI \-\-openai\-key= KEY
+OpenAI bearer API key.
 .TP
-.B \-h, \--help
+.BI \-\-openai\-user= USER
+OpenAI basic-auth user. Takes precedence over the API key.
+.TP
+.BI \-\-openai\-password= PASSWORD
+OpenAI basic-auth password.
+.TP
+.BI \-\-openai\-api= NAME
+OpenAI endpoint family:
+.B chat
+for /chat/completions or
+.B responses
+for /responses. Default: chat.
+.TP
+.BI \-\-model= MODEL
+For OpenCode,
+.I provider/model
+or
+.IR provider/model#variant .
+For OpenAI, the model name. Defaults to the configured model, or OpenCode's own
+default.
+.TP
+.BI \-\-timeout= SECONDS
+Request deadline. Default: 120 seconds. Must be a positive integer no larger
+than 2147483647.
+.TP
+.B \-\-dry\-run
+With
+.BR assist ,
+generate and validate the proposal, print it as JSON, and write no files. The
+request still runs.
+.TP
+.BI \-\-map\-out= PATH
+With
+.BR map ,
+write the binary map to PATH instead of the cache directory.
+.TP
+.BR \-\-summary ", " \-\-no\-summary
+With
+.BR map ,
+include directory file and byte totals in the rendered text. Default: enabled.
+.TP
+.B \-\-print
+With
+.BR map ,
+print the rendered map text after writing the binary map.
+.TP
+.BR \-h ", " \-\-help
 Display help and exit.
 .TP
-.B \--version
+.B \-\-version
 Display the version and exit.
 .PP
-Boolean long options accept negative spellings such as \--no-dry-run.
+Boolean long options accept negative spellings such as \--no\-dry-run.
+.SH CONFIGURATION
+Tooling settings are read from
+.I $XDG_CONFIG_HOME/rattpack/Rattpack.json
+on POSIX and
+.IR %APPDATA% / rattpack / Rattpack.json
+on Windows. The file is optional and independent of
+.IR Config.toml ,
+which is build configuration read by Rattscript. Every value may be overridden
+by an environment variable or a command-line flag.
+.PP
+Values are resolved as: command-line flag, then environment, then this file,
+then the built-in default.
+.TP
+.B backend
+.B opencode
+or
+.BR openai .
+.TP
+.B opencode.executable
+, .B opencode.server
+, .B opencode.model
+, .B opencode.timeout
+, .B opencode.standalone
+.TP
+.B openai.base_url
+, .B openai.api_key
+, .B openai.user
+, .B openai.password
+, .B openai.organization
+, .B openai.project
+, .B openai.model
+, .B openai.api
+, .B openai.timeout
+.TP
+.B map.summary
+, .B map.max_entries
+.TP
+.B plugins
+, .B scripts
+, .B commands
+Objects of name to string, overriding plugin library paths and naming script
+and command locations for tooling.
+.PP
+Example:
+.PP
+.EX
+{
+  "backend": "openai",
+  "openai": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "user": "builder",
+    "password": "secret",
+    "model": "local-model",
+    "api": "chat"
+  },
+  "opencode": { "standalone": true },
+  "map": { "summary": true, "max_entries": 200000 },
+  "scripts": { "scaffold": "tools/scaffold.ratt" },
+  "commands": { "format": "clang-format" }
+}
+.EE
+.SH ENVIRONMENT
+.TP
+.BR OPENAI_BASE ", " OPENAI_API_BASE
+OpenAI-compatible base URL.
+.TP
+.B OPENAI_API_KEY
+OpenAI bearer API key.
+.TP
+.BR OPENAI_USER ", " RATTPACK_OPENAI_USER
+OpenAI basic-auth user.
+.TP
+.BR OPENAI_PASSWORD ", " RATTPACK_OPENAI_PASSWORD
+OpenAI basic-auth password.
+.TP
+.BR OPENAI_ORG_ID ", " OPENAI_PROJECT_ID
+Optional OpenAI organization and project headers.
+.TP
+.BR OPENAI_MODEL ", " RATTPACK_OPENAI_MODEL
+OpenAI model name.
+.TP
+.B RATTPACK_OPENAI_API
+OpenAI endpoint family, chat or responses.
+.TP
+.B RATTPACK_OPENAI_TIMEOUT
+OpenAI request deadline in seconds.
+.TP
+.B RATTPACK_OPENAI_URL, RATTPACK_OPENAI_KEY
+Alternative spellings of the OpenAI URL and key.
+.TP
+.BR OPENCODE ", " RATTPACK_OPENCODE
+OpenCode executable name or path.
+.TP
+.B RATTPACK_OPENCODE_SERVER
+Explicit OpenCode server URL.
+.TP
+.BR RATTPACK_OPENCODE_MODEL ", " OPENCODE_MODEL
+OpenCode model selection.
+.TP
+.B RATTPACK_OPENCODE_STANDALONE
+Set to 0, false, no, or off to share the background service.
+.TP
+.B RATTPACK_OPENCODE_TIMEOUT
+OpenCode request deadline in seconds.
+.TP
+.BR XDG_CONFIG_HOME ", " APPDATA
+Location of the Rattpack configuration directory.
+.TP
+.BR XDG_CACHE_HOME ", " LOCALAPPDATA
+Location of the directory map cache.
+.TP
+.B PATH
+Search path for the default OpenCode executable.
+.SH MAP DSL
+The text form of a directory map is one entry per line, indented by one space
+per depth level. A colon separates a name from its attributes. Inside a name, a
+backslash escapes a backslash, a colon, or a space.
+.PP
+.EX
+d NAME:F COUNT:B BYTES   directory, with total files and bytes below it
+f NAME:X:BYTES:HASH      file; X marks an executable
+l NAME                   symbolic link
+x NAME                   any other entry kind
+.EE
+.PP
+COUNT is a plain integer. BYTES uses k and M suffixes. HASH is eight lowercase
+hex digits of the file's content fingerprint, and is present only for source and
+build-input file types. For example:
+.PP
+.EX
+d demo:F6:B273.5k
+ f README.md:7:b21109ab
+ f run.sh:X:10:bc1f407a
+ d src:F4:B273.5k
+  f main.c:22:0b377551
+  d core:F2:B28
+   f util.c:19:f86d8b1f
+.EE
+.PP
+Version-control metadata, build output directories, dependency caches, and dot
+entries are never mapped. Entries are sorted, so the same tree always renders
+identically.
 .SH FILES
 .TP
 .I Rattspec
@@ -68,23 +308,28 @@ Root project identity and build targets.
 .I Rattpkg
 Root package identity and dependencies.
 .TP
-.I PREFIX/bin/plugins/opencode-assist.so
-Default plugin location on POSIX. macOS uses .dylib and Windows uses .dll.
-Install the plugin using install.sh \--with-plugins, or select \--plugin.
-.SH ENVIRONMENT
+.IR $XDG_CACHE_HOME/rattpack/*.bin
+Binary directory maps, one per mapped directory.
 .TP
-.B PATH
-Search path for the default OpenCode executable.
+.IR $XDG_CONFIG_HOME/rattpack/Rattpack.json
+Optional tooling configuration.
+.TP
+.I PREFIX/bin/plugins/opencode\-assist.so
+Default plugin location on POSIX. macOS uses .dylib and Windows uses .dll.
+Install the plugins using install.sh \--with\-plugins, or select \--plugin.
 .SH EXIT STATUS
 0 indicates success, help, or version output; 1 indicates an application
 diagnostic or assist failure; 2 indicates argument parsing failure.
-Diagnostics go to standard error. E_ASSIST reports failed or timed-out requests,
-invalid responses, and concurrent edits; E_PLUGIN_ABI reports plugin failures.
+Diagnostics go to standard error. E_ASSIST reports failed, timed-out, or
+unusable backend responses and concurrent edits; E_MAP reports a directory or
+map file that cannot be read; E_PLUGIN_ABI reports plugin failures.
 .SH EXAMPLES
 .nf
-rattspec assist 'add these libraries: fmt and zlib'
-rattspec assist 'build a C library and an executable that links it' \-C workspace
-rattspec assist 'make this a monorepo' \--dry-run
+rattspec map . --print
+rattspec assist 'add these libraries: fmt and zlib' --opencode
+rattspec assist 'build a C library and an executable that links it' \-\-openai \\
+    \-\-openai\-url http://127.0.0.1:8000/v1 \-\-openai\-user builder \-\-model my\-model
+rattspec map src \-\-map\-out /tmp/src.bin
 .fi
 .SH SEE ALSO
 .BR rattbuild (1),

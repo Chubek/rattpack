@@ -188,34 +188,63 @@ this release. Package consumption is through already-fetched source trees.
 ### Synopsis
 
 ```text
-rattspec assist REQUEST [-C DIRECTORY] [OPTIONS]
+rattspec assist REQUEST [-C DIRECTORY] [--opencode | --openai] [OPTIONS]
+rattspec map DIRECTORY [--print] [--map-out PATH] [--no-summary]
 ```
 
-`rattspec` creates and updates the two root files, `Rattspec` and `Rattpkg`, from
-a natural-language request. It requires the `opencode-assist` plugin and OpenCode
-V2 on `PATH`.
+`rattspec` has two commands. `assist` creates and updates the two root files,
+`Rattspec` and `Rattpkg`, from a natural-language request. `map` scans a
+directory into a compact binary map and can print its terse text form.
+
+Assist requires the matching plugin, `opencode-assist` or `openai-assist`, and
+for the OpenCode backend, OpenCode V2 on `PATH`.
+
+### Assist backends
+
+| Backend | Transport | Credentials |
+| --- | --- | --- |
+| `--opencode` | The `opencode api` CLI, so OpenCode's own service discovery and authentication apply | Handled by the CLI; launched with `--standalone` by default |
+| `--openai` | The vendored `openaipp` client, linked only into that plugin | Bearer API key, or HTTP basic user and password |
+
+The two flags are mutually exclusive. Without either, the backend comes from
+`Rattpack.json`. OpenCode accepts `provider/model` or `provider/model#variant`;
+the OpenAI backend takes a plain model name and uses `/chat/completions` by
+default, or `/responses` with `--openai-api responses`.
+
+### Options
 
 | Option | Effect |
 | --- | --- |
-| `-C`, `--directory` | Project directory; default `.` |
-| `--plugin` | Assist plugin path; default `plugins/opencode-assist.*` beside the executable |
-| `--opencode` | OpenCode executable name or path; default `opencode` |
-| `--server` | Explicit OpenCode server URL; default is the CLI's own discovery and authentication |
-| `--model` | `provider/model` or `provider/model#variant`; default is OpenCode's configured model |
-| `--timeout` | IPC deadline in seconds; default 120 |
+| `-C`, `--directory` | Project directory for `assist`, default directory for `map` |
+| `--opencode` / `--openai` | Select the assist backend |
+| `--plugin` | Plugin path; default is the backend's plugin beside the executable |
+| `--opencode-executable` | OpenCode executable name or path; default `opencode` |
+| `--server` | Explicit OpenCode server URL |
+| `--standalone` / `--no-standalone` | Private OpenCode server; default on |
+| `--openai-url` | OpenAI-compatible base URL, including any path prefix |
+| `--openai-key` | OpenAI bearer API key |
+| `--openai-user` / `--openai-password` | OpenAI basic-auth credentials; these take precedence over the key |
+| `--openai-api` | `chat` or `responses`; default `chat` |
+| `--model` | Model selection for the chosen backend |
+| `--timeout` | Request deadline in seconds; default 120 |
 | `--dry-run` | Print the validated proposal as JSON and write nothing |
-| `--version` | Print the version and exit |
+| `--map-out` | Binary map destination for `map` |
+| `--print` | Print rendered map text after writing the binary map |
+| `--summary` / `--no-summary` | Directory totals in rendered text; default on |
+
+### Assist
 
 ```sh
-rattspec assist 'add these libraries: fmt and zlib'
-rattspec assist 'build a C library and an executable that links it' -C workspace
+rattspec assist 'add these libraries: fmt and zlib' --opencode
+rattspec assist 'build a C library and an exe that links it' --openai \
+    --openai-url http://127.0.0.1:8000/v1 --openai-user builder --model my-model
 rattspec assist 'make this a monorepo' --dry-run
 ```
 
-The command reads the existing `Rattspec`/`Rattpkg` plus a bounded inventory of
-source paths, sends them to OpenCode's `POST /api/experimental/generate` endpoint
-through the `opencode api` CLI, and expects a JSON object of complete replacement
-files. Unchanged files may be omitted; a missing file must be created.
+The command reads the existing `Rattspec`/`Rattpkg`, a bounded path inventory,
+and the cached directory map when one exists, then expects a JSON object of
+complete replacement files. Unchanged files may be omitted; a missing file must
+be created.
 
 Nothing is written until the whole proposal is validated: each file must parse,
 lint, declare exactly one `project()`/`package()` identity, and declare at least
@@ -224,12 +253,82 @@ manifest reader, so dependency sources, Git pins, and checksums are host-validat
 rather than trusted. Model output is never evaluated as Rattscript.
 
 Files are written atomically, and only if they still match the content read
-before the request. An edit made while OpenCode was generating raises `E_ASSIST`
-instead of overwriting it. `E_ASSIST` also reports an unreachable executable,
-a failed or timed-out request, and an unusable response.
+before the request. An edit made while the model was generating raises
+`E_ASSIST` instead of overwriting it. `E_ASSIST` also reports an unreachable
+backend, a failed or timed-out request, and an unusable response.
 
-Assist does not run `rattpkg resolve` and never writes `Rattpkg.lock`. The model's
-summary names any follow-up step it expects.
+Assist does not run `rattpkg resolve` and never writes `Rattpkg.lock`. The
+model's summary names any follow-up step it expects.
+
+### Configuration
+
+Tooling settings are read from `$XDG_CONFIG_HOME/rattpack/Rattpack.json`
+(`%APPDATA%\rattpack\Rattpack.json` on Windows). This file is independent of
+`Config.toml`: it configures host tools and is never read by a build graph.
+
+```json
+{
+  "backend": "openai",
+  "openai": {
+    "base_url": "http://127.0.0.1:8000/v1",
+    "user": "builder",
+    "password": "secret",
+    "model": "local-model",
+    "api": "chat"
+  },
+  "opencode": { "standalone": true },
+  "map": { "summary": true, "max_entries": 200000 },
+  "scripts": { "scaffold": "tools/scaffold.ratt" },
+  "commands": { "format": "clang-format" }
+}
+```
+
+Every value resolves in the order **command-line flag, environment variable,
+this file, built-in default**. Recognised environment names include `OPENAI_BASE`,
+`OPENAI_API_KEY`, `OPENAI_USER`, `OPENAI_PASSWORD`, `OPENAI_ORG_ID`,
+`OPENAI_PROJECT_ID`, `OPENAI_MODEL`, `OPENCODE`, `RATTPACK_OPENCODE_SERVER`,
+`RATTPACK_OPENCODE_MODEL`, `RATTPACK_OPENCODE_STANDALONE`, and the matching
+`RATTPACK_OPENAI_*` and `RATTPACK_OPENCODE_TIMEOUT` names. See
+`man/rattspec.1` for the complete list.
+
+### `map`
+
+```sh
+rattspec map . --print
+rattspec map src --map-out /tmp/src.bin
+```
+
+`map` writes `$XDG_CACHE_HOME/rattpack/<directoryname>.bin`. `assist` reuses
+that cache, so a large project is described by one short inventory instead of a
+long path list.
+
+The text form is one entry per line, indented one space per depth, with a colon
+separating a name from its attributes. A backslash escapes a backslash, colon,
+or space inside a name.
+
+```text
+d NAME:F COUNT:B BYTES   directory, totals for everything below it
+f NAME:X:BYTES:HASH      file; X marks an executable
+l NAME                   symbolic link
+x NAME                   any other entry kind
+```
+
+```text
+d demo:F6:B273.5k
+ f README.md:7:b21109ab
+ f run.sh:X:10:bc1f407a
+ d src:F4:B273.5k
+  f main.c:22:0b377551
+  d core:F2:B28
+   f util.c:19:f86d8b1f
+```
+
+`HASH` is eight hex digits of the file's content fingerprint and appears only for
+source and build-input types. Version-control metadata, build outputs,
+dependency caches, and dot entries are never mapped, and entries are sorted so
+the same tree always renders identically. Maps are read back through the
+operating system's memory-mapping interface; an unreadable or stale map raises
+`E_MAP`.
 
 ## 4.5 `rattsc`
 
